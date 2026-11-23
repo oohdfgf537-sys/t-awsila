@@ -1,0 +1,523 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>توصيلة | Tawsila</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+:root{--red:#e51b2b;--dark:#090909;--panel:#151515}
+*{box-sizing:border-box}
+body{margin:0;background:var(--dark);color:white;font-family:Cairo,Arial,sans-serif;padding-bottom:85px}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+header{padding:17px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #292929;position:sticky;top:0;background:#090909;z-index:1000}
+.logo{font-size:25px;font-weight:900}
+.logo span{color:var(--red)}
+.logo small{display:block;font-size:9px;color:#aaa;letter-spacing:3px}
+.header-btn{background:#1b1b1b;border:1px solid #333;color:white;border-radius:12px;padding:9px 13px}
+.hero{margin:16px;border-radius:22px;overflow:hidden;min-height:235px;position:relative;background:#171717 url('https://images.unsplash.com/photo-1592198084033-aade902d1aae?auto=format&fit=crop&w=1200&q=85') center/cover;border:1px solid #333}
+.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#090909 0%,transparent 85%)}
+.hero-content{position:absolute;z-index:2;bottom:17px;right:18px}
+.hero h1{font-size:29px;margin:0;font-weight:900}
+.hero p{color:#ddd;margin:3px 0;font-size:12px}
+.tag{display:inline-block;background:var(--red);padding:4px 11px;border-radius:20px;font-size:10px;font-weight:bold;margin-bottom:7px}
+.section{padding:0 16px;margin-top:20px}
+.section-title{font-size:17px;font-weight:800;margin-bottom:12px}
+.services{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.service{background:#151515;border:1px solid #292929;border-radius:17px;padding:14px 5px;text-align:center;color:white}
+.service.active{border:1px solid var(--red);background:#291014}
+.emoji{font-size:28px;display:block;margin-bottom:5px}
+.service strong{font-size:12px}
+.service small{display:block;color:#aaa;font-size:9px}
+.card{background:var(--panel);border:1px solid #292929;border-radius:18px;padding:15px;margin-top:12px}
+.field-label{font-size:11px;color:#aaa;margin:10px 0 5px}
+.input{width:100%;background:#090909;border:1px solid #333;border-radius:12px;padding:13px;color:white;outline:none;font-size:13px}
+.input:focus{border-color:var(--red)}
+#map{height:260px;border-radius:15px;overflow:hidden;border:1px solid #333;margin-top:10px}
+.hint{font-size:10px;color:#aaa;margin-top:8px}
+.primary{width:100%;border:0;background:var(--red);color:white;padding:14px;border-radius:13px;font-weight:900;font-size:14px;margin-top:13px}
+.secondary{width:100%;border:1px solid #444;background:#222;color:white;padding:12px;border-radius:12px;margin-top:9px}
+.price-box{display:none;background:#241014;border:1px solid #63202a;border-radius:15px;padding:14px;margin-top:12px}
+.price-number{font-size:27px;color:#ff4050;font-weight:900}
+.muted{color:#999;font-size:11px}
+.hidden{display:none!important}
+.item{background:#101010;border:1px solid #303030;border-radius:13px;padding:12px;margin:9px 0;font-size:12px}
+.item strong{color:#ff5260}
+.status{color:#ffb84d}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:1200;display:flex;justify-content:space-around;background:#111;border-top:1px solid #333;padding:10px 3px 14px}
+nav button{background:none;border:0;color:#999;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button b{font-size:20px}
+nav button.active{color:#ff4050}
+.modal{position:fixed;inset:0;background:#000c;z-index:3000;display:flex;align-items:center;justify-content:center;padding:18px}
+.modal-card{width:100%;max-width:400px;background:#171717;border:1px solid #444;border-radius:20px;padding:20px}
+.modal h2{margin-top:0}
+</style>
+</head>
+
+<body>
+
+<header>
+ <div class="logo">توصيلة<span>.</span><small>TAWSILA LUXURY RIDE</small></div>
+ <button class="header-btn" onclick="openLogin()">حسابي</button>
+</header>
+
+<section class="hero">
+ <div class="hero-content">
+  <span class="tag">رحلتك تبدأ من هنا</span>
+  <h1>وصل بأناقة.</h1>
+  <p>خدمة نقل وتوصيل بمستوى مختلف</p>
+ </div>
+</section>
+
+<div class="section">
+ <div class="section-title">اختر خدمتك</div>
+ <div class="services">
+  <button class="service active" id="carBtn" onclick="chooseService('car')">
+   <span class="emoji">🏎️</span><strong>سيارات</strong><small>رحلات مميزة</small>
+  </button>
+  <button class="service" id="motoBtn" onclick="chooseService('moto')">
+   <span class="emoji">🏍️</span><strong>دراجات</strong><small>تنقل سريع</small>
+  </button>
+  <button class="service" id="parcelBtn" onclick="chooseService('parcel')">
+   <span class="emoji">📦</span><strong>طرود</strong><small>توصيل آمن</small>
+  </button>
+ </div>
+</div>
+
+<div class="section" id="bookingSection">
+ <div class="section-title">احجز رحلتك</div>
+ <div class="card">
+  <div class="field-label">مكان الانطلاق</div>
+  <input class="input" id="pickupText" placeholder="اختر نقطة الانطلاق من الخريطة">
+  <div class="field-label">الوجهة</div>
+  <input class="input" id="destinationText" placeholder="اكتب اسم الوجهة أو اخترها من الخريطة">
+  <div class="field-label">حدد الموقع من الخريطة</div>
+  <div id="map"></div>
+  <div class="hint">اضغط على الخريطة مرتين: أولاً الانطلاق ثم الوجهة.</div>
+  <button class="secondary" onclick="myLocation()">📍 استخدام موقعي الحالي</button>
+  <button class="primary" onclick="calculateTrip()">احسب المسافة والسعر</button>
+  <div class="price-box" id="priceBox">
+   <div class="muted">السعر التقديري</div>
+   <div class="price-number"><span id="priceValue">0</span> د.ل</div>
+   <div class="muted">المسافة: <span id="distanceValue">0</span> كم</div>
+   <button class="primary" onclick="createRide()">تأكيد طلب الرحلة</button>
+  </div>
+ </div>
+</div>
+
+<div class="section hidden" id="myRidesSection">
+ <div class="section-title">رحلاتي</div>
+ <div class="card" id="myRides">سجّل الدخول لعرض رحلاتك.</div>
+</div>
+
+<div class="section hidden" id="driverSection">
+ <div class="section-title">منطقة السائق</div>
+ <div class="card" id="driverContent"></div>
+</div>
+
+<div class="section hidden" id="applySection">
+ <div class="section-title">انضم إلى فريق السائقين</div>
+ <div class="card">
+  <div class="field-label">اسمك الكامل</div>
+  <input class="input" id="driverName" placeholder="الاسم الكامل">
+  <div class="field-label">نوع المركبة</div>
+  <select class="input" id="vehicleType">
+   <option value="car">سيارة</option>
+   <option value="moto">دراجة نارية</option>
+  </select>
+  <button class="primary" onclick="applyDriver()">إرسال طلب الانضمام</button>
+  <p class="hint">سيتم مراجعة طلبك قبل تفعيل حساب السائق.</p>
+ </div>
+</div>
+
+<nav>
+ <button class="active" onclick="showSection('bookingSection',this)"><b>⌂</b>الرئيسية</button>
+ <button onclick="showSection('myRidesSection',this);loadMyRides()"><b>▤</b>رحلاتي</button>
+ <button onclick="showSection('applySection',this)"><b>＋</b>كن سائقاً</button>
+ <button onclick="openLogin()"><b>◉</b>حسابي</button>
+</nav>
+
+<div class="modal hidden" id="loginModal">
+ <div class="modal-card">
+  <h2>تسجيل الدخول</h2>
+  <p class="muted">ادخل رقم هاتفك الليبي لاستلام رمز التحقق.</p>
+  <div class="field-label">رقم الهاتف</div>
+  <input class="input" id="phone" placeholder="0912345678" inputmode="tel">
+  <div id="recaptcha-container"></div>
+  <button class="primary" onclick="sendCode()">إرسال رمز SMS</button>
+  <div id="verifyArea" class="hidden">
+   <div class="field-label">رمز التحقق</div>
+   <input class="input" id="otp" placeholder="أدخل الرمز المرسل" inputmode="numeric">
+   <button class="primary" onclick="verifyCode()">تأكيد الرمز</button>
+  </div>
+  <button class="secondary" onclick="closeLogin()">إغلاق</button>
+  <p id="loginMessage" class="hint"></p>
+ </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+const firebaseConfig = {
+ apiKey:"AIzaSyDE_wyCpcoDStuUyNud9PiUPwezS83Xr00",
+ authDomain:"tawsila-53870.firebaseapp.com",
+ projectId:"tawsila-53870",
+ storageBucket:"tawsila-53870.firebasestorage.app",
+ messagingSenderId:"200480445099",
+ appId:"1:200480445099:web:2be93d9778ba54c84b1dee"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth();
+const db=firebase.firestore();
+
+let currentUser=null;
+let userData=null;
+let confirmationResult=null;
+let recaptcha=null;
+let recaptchaPromise=null;
+let service='car';
+let pickup=null;
+let destination=null;
+let distanceKm=0;
+let tripPrice=0;
+let map=null;
+let markers=[];
+let routeLayer=null;
+
+function openLogin(){document.getElementById('loginModal').classList.remove('hidden')}
+function closeLogin(){document.getElementById('loginModal').classList.add('hidden')}
+function message(t){document.getElementById('loginMessage').textContent=t}
+
+function normalizePhone(value){
+ let p=value.replace(/[\s\-]/g,'');
+ if(p.startsWith('+218'))return p;
+ if(p.startsWith('00218'))return '+'+p.substring(2);
+ if(p.startsWith('218'))return '+'+p;
+ if(p.startsWith('0'))return '+218'+p.substring(1);
+ if(p.startsWith('9'))return '+218'+p;
+ return '';
+}
+
+async function setupRecaptcha(){
+ if(!recaptcha){
+  recaptcha=new firebase.auth.RecaptchaVerifier(
+   'recaptcha-container',
+   {size:'normal'},
+   auth
+  );
+  recaptchaPromise=recaptcha.render();
+ }
+ await recaptchaPromise;
+}
+
+async function sendCode(){
+ const phone=normalizePhone(document.getElementById('phone').value);
+ if(!/^\+2189\d{8}$/.test(phone)){
+  message('اكتب رقم ليبي صحيح، مثال 0912345678');
+  return;
+ }
+ try{
+  message('جارٍ إرسال الرمز...');
+  await setupRecaptcha();
+  confirmationResult=await auth.signInWithPhoneNumber(phone,recaptcha);
+  document.getElementById('verifyArea').classList.remove('hidden');
+  message('تم إرسال الرمز. تحقق من رسائل هاتفك.');
+ }catch(e){
+  message('تعذر الإرسال: '+e.message);
+  if(recaptcha){try{recaptcha.clear()}catch(x){}}
+  recaptcha=null;
+  recaptchaPromise=null;
+ }
+}
+
+async function verifyCode(){
+ const code=document.getElementById('otp').value.trim();
+ if(!code){message('أدخل رمز التحقق.');return}
+ try{
+  await confirmationResult.confirm(code);
+  message('تم تسجيل الدخول بنجاح.');
+  closeLogin();
+ }catch(e){
+  message('الرمز غير صحيح أو انتهت صلاحيته.');
+ }
+}
+
+auth.onAuthStateChanged(async user=>{
+ currentUser=user;
+ userData=null;
+ if(user){
+  try{
+   const ref=db.collection('users').doc(user.uid);
+   const snap=await ref.get();
+   if(snap.exists){
+    userData=snap.data();
+   }else{
+    await ref.set({
+     name:'مستخدم توصيلة',
+     email:user.phoneNumber||'',
+     role:'customer',
+     createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    userData={role:'customer'};
+   }
+  }catch(e){
+   alert('تعذر تحميل الحساب: '+e.message);
+  }
+  updateAccount();
+  loadMyRides();
+ }else{
+  updateAccount();
+ }
+});
+
+function updateAccount(){
+ const btn=document.querySelector('.header-btn');
+ if(currentUser){
+  btn.textContent='حسابي ✓';
+  if(userData&&userData.role==='driver'&&userData.approved===true){
+   document.getElementById('driverSection').classList.remove('hidden');
+   loadDriverRides();
+  }
+ }else{
+  btn.textContent='حسابي';
+  document.getElementById('driverSection').classList.add('hidden');
+ }
+}
+
+function chooseService(s){
+ service=s;
+ ['car','moto','parcel'].forEach(x=>{
+  document.getElementById(x+'Btn').classList.toggle('active',x===s);
+ });
+ document.getElementById('priceBox').style.display='none';
+}
+
+function showSection(id,button){
+ document.querySelectorAll('.section').forEach(s=>s.classList.add('hidden'));
+ document.getElementById(id).classList.remove('hidden');
+ document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+ if(button)button.classList.add('active');
+ document.getElementById(id).scrollIntoView({behavior:'smooth'});
+}
+
+function initMap(){
+ map=L.map('map').setView([32.8872,13.1913],12);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  maxZoom:19,
+  attribution:'© OpenStreetMap'
+ }).addTo(map);
+
+ map.on('click',e=>{
+  if(!pickup){
+   pickup=e.latlng;
+   addMarker(pickup,'نقطة الانطلاق');
+   document.getElementById('pickupText').value='تم تحديد نقطة الانطلاق';
+  }else if(!destination){
+   destination=e.latlng;
+   addMarker(destination,'الوجهة');
+   document.getElementById('destinationText').value='تم تحديد الوجهة';
+  }else{
+   clearMapPoints();
+   pickup=e.latlng;
+   addMarker(pickup,'نقطة الانطلاق');
+   document.getElementById('pickupText').value='تم تحديد نقطة الانطلاق';
+   document.getElementById('destinationText').value='';
+  }
+  document.getElementById('priceBox').style.display='none';
+ });
+}
+
+function addMarker(point,label){
+ markers.push(L.marker(point).addTo(map).bindPopup(label));
+}
+
+function clearMapPoints(){
+ markers.forEach(m=>map.removeLayer(m));
+ markers=[];
+ if(routeLayer){map.removeLayer(routeLayer);routeLayer=null}
+ pickup=null;
+ destination=null;
+}
+
+function myLocation(){
+ if(!navigator.geolocation){
+  alert('المتصفح لا يدعم تحديد الموقع');return;
+ }
+ navigator.geolocation.getCurrentPosition(pos=>{
+  const p=L.latLng(pos.coords.latitude,pos.coords.longitude);
+  clearMapPoints();
+  pickup=p;
+  addMarker(p,'موقعي الحالي');
+  map.setView(p,15);
+  document.getElementById('pickupText').value='موقعي الحالي';
+ },()=>alert('اسمح للمتصفح باستخدام موقعك.'));
+}
+
+async function calculateTrip(){
+ if(!pickup||!destination){
+  alert('حدد نقطة الانطلاق والوجهة من الخريطة أولاً.');
+  return;
+ }
+ try{
+  const url=`https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
+  const response=await fetch(url);
+  const data=await response.json();
+  if(!data.routes||!data.routes.length)throw new Error('route');
+  distanceKm=data.routes[0].distance/1000;
+  if(routeLayer)map.removeLayer(routeLayer);
+  routeLayer=L.geoJSON(data.routes[0].geometry,{
+   style:{color:'#e51b2b',weight:5}
+  }).addTo(map);
+  map.fitBounds(routeLayer.getBounds(),{padding:[20,20]});
+  let base=5,rate=1.5;
+  if(service==='moto'){base=3;rate=1}
+  if(service==='parcel'){base=4;rate=1.2}
+  tripPrice=Math.ceil(base+distanceKm*rate);
+  document.getElementById('distanceValue').textContent=distanceKm.toFixed(1);
+  document.getElementById('priceValue').textContent=tripPrice;
+  document.getElementById('priceBox').style.display='block';
+ }catch(e){
+  alert('لم نتمكن من حساب الطريق. حاول مرة أخرى.');
+ }
+}
+
+async function createRide(){
+ if(!currentUser){
+  alert('سجّل الدخول برقم الهاتف أولاً.');
+  openLogin();
+  return;
+ }
+ if(!pickup||!destination||!tripPrice){
+  alert('احسب السعر أولاً.');
+  return;
+ }
+ try{
+  await db.collection('rides').add({
+   customerId:currentUser.uid,
+   service:service,
+   pickup:{lat:pickup.lat,lng:pickup.lng},
+   destination:{lat:destination.lat,lng:destination.lng},
+   distance:Number(distanceKm.toFixed(2)),
+   price:tripPrice,
+   status:'pending',
+   createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
+  alert('تم إرسال طلبك بنجاح. نبحث عن سائق.');
+  document.getElementById('priceBox').style.display='none';
+  clearMapPoints();
+  document.getElementById('pickupText').value='';
+  document.getElementById('destinationText').value='';
+  loadMyRides();
+ }catch(e){
+  alert('تعذر إرسال الطلب: '+e.message);
+ }
+}
+
+async function loadMyRides(){
+ const box=document.getElementById('myRides');
+ if(!currentUser){
+  box.textContent='سجّل الدخول لعرض رحلاتك.';
+  return;
+ }
+ try{
+  const snap=await db.collection('rides').where('customerId','==',currentUser.uid).get();
+  if(snap.empty){box.textContent='لا توجد رحلات حتى الآن.';return}
+  box.innerHTML='';
+  snap.forEach(doc=>{
+   const r=doc.data();
+   const item=document.createElement('div');
+   item.className='item';
+   item.innerHTML=`<strong>${serviceName(r.service)}</strong><br>
+   المسافة: ${r.distance} كم<br>
+   السعر: ${r.price} د.ل<br>
+   الحالة: <span class="status">${statusName(r.status)}</span>`;
+   box.appendChild(item);
+  });
+ }catch(e){
+  box.textContent='تعذر تحميل الرحلات: '+e.message;
+ }
+}
+
+function serviceName(s){
+ return s==='car'?'سيارة':s==='moto'?'دراجة نارية':'توصيل طرود';
+}
+function statusName(s){
+ return s==='pending'?'بانتظار سائق':s==='accepted'?'تم قبول الرحلة':'مكتمل';
+}
+
+async function applyDriver(){
+ if(!currentUser){
+  alert('سجّل الدخول أولاً.');
+  openLogin();
+  return;
+ }
+ const name=document.getElementById('driverName').value.trim();
+ const vehicle=document.getElementById('vehicleType').value;
+ if(name.length<3){alert('اكتب اسمك الكامل.');return}
+ try{
+  await db.collection('driverApplications').doc(currentUser.uid).set({
+   name:name,
+   email:currentUser.phoneNumber||'',
+   vehicleType:vehicle,
+   status:'pending',
+   createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
+  alert('تم إرسال طلبك للمراجعة بنجاح.');
+ }catch(e){
+  alert('تعذر إرسال الطلب: '+e.message);
+ }
+}
+
+async function loadDriverRides(){
+ const box=document.getElementById('driverContent');
+ if(!currentUser||!userData||userData.role!=='driver'||userData.approved!==true){
+  box.textContent='حساب السائق غير مفعل.';
+  return;
+ }
+ try{
+  const snap=await db.collection('rides').where('status','==','pending').get();
+  if(snap.empty){box.textContent='لا توجد طلبات جديدة حالياً.';return}
+  box.innerHTML='';
+  snap.forEach(doc=>{
+   const r=doc.data();
+   const item=document.createElement('div');
+   item.className='item';
+   item.innerHTML=`<strong>${serviceName(r.service)}</strong><br>
+   المسافة: ${r.distance} كم<br>السعر: ${r.price} د.ل`;
+   const btn=document.createElement('button');
+   btn.className='primary';
+   btn.textContent='قبول الرحلة';
+   btn.onclick=()=>acceptRide(doc.id);
+   item.appendChild(btn);
+   box.appendChild(item);
+  });
+ }catch(e){
+  box.textContent='تعذر تحميل الطلبات: '+e.message;
+ }
+}
+
+async function acceptRide(id){
+ try{
+  await db.collection('rides').doc(id).update({
+   status:'accepted',
+   driverId:currentUser.uid
+  });
+  alert('تم قبول الرحلة.');
+  loadDriverRides();
+ }catch(e){
+  alert('تعذر قبول الرحلة: '+e.message);
+ }
+}
+
+initMap();
+</script>
+</body>
+</html>
