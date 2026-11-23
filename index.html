@@ -1,15 +1,15 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>توصيلة</title>
+
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#090909;color:white;font-family:Arial}
-header{padding:22px;background:#151515;text-align:center;border-bottom:2px solid #e50914}
-h1{color:#e50914;font-size:32px;margin:5px}
+header{padding:22px;background:#151515;text-align:center;border-bottom:2px solid #d4af37}
+h1{color:#d4af37;font-size:32px;margin:5px}
 main{padding:18px;max-width:550px;margin:auto}
 .hero{background:linear-gradient(135deg,#290000,#111);padding:25px;border-radius:18px;text-align:center;margin:15px 0}
 .hero h2{font-size:25px}
@@ -17,23 +17,29 @@ main{padding:18px;max-width:550px;margin:auto}
 .card{background:#191919;padding:18px;border-radius:15px;margin:14px 0}
 label{display:block;margin:12px 0 7px}
 input,select{width:100%;padding:14px;border-radius:9px;border:1px solid #444;background:#292929;color:white;font-size:16px}
-button{width:100%;padding:15px;border:0;border-radius:10px;background:#e50914;color:white;font-size:17px;font-weight:bold;margin-top:12px}
+button{width:100%;padding:15px;border:0;border-radius:10px;background:#d4af37;color:#111;font-size:17px;font-weight:bold;margin-top:12px}
 button:active{opacity:.7}
 .service{display:flex;gap:8px}
-.service button{flex:1;background:#292929}
-.service button.active{background:#e50914}
-#map{height:240px;border-radius:12px;margin-top:12px}
-.result{color:#ff4545;font-size:19px;font-weight:bold;text-align:center}
+.service button{flex:1;background:#292929;color:white}
+.service button.active{background:#d4af37;color:#111}
+#map{height:260px;border-radius:12px;margin-top:12px}
+.result{color:#d4af37;font-size:18px;font-weight:bold;text-align:center}
 small{color:#aaa}
+.message{color:#f1c75b;margin-top:12px}
 </style>
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
+
 <body>
+
 <header>
 <h1>توصيلة</h1>
 <small>خدمات النقل والتوصيل في ليبيا</small>
 </header>
+
 <main>
+
 <div class="hero">
 <div class="car">🏎️</div>
 <h2>رحلتك تبدأ معنا</h2>
@@ -42,158 +48,288 @@ small{color:#aaa}
 
 <div class="card">
 <h3>تسجيل الدخول</h3>
+
 <label>رقم الهاتف الليبي</label>
 <input id="phone" type="tel" placeholder="+2189XXXXXXXX">
-<button onclick="login()">إرسال رمز التحقق</button>
+
+<button id="loginBtn" onclick="login()">إرسال رمز التحقق</button>
+
 <div id="recaptcha-container"></div>
+
 <div id="verifyBox" style="display:none">
 <label>رمز SMS</label>
-<input id="otp" placeholder="أدخل الرمز">
+<input id="otp" type="text" placeholder="أدخل الرمز">
 <button onclick="verify()">تأكيد الرمز</button>
 </div>
-<p id="authMessage"></p>
+
+<p id="authMessage" class="message"></p>
 </div>
 
 <div class="card">
 <h3>اطلب توصيلة</h3>
+
 <div class="service">
 <button class="active" onclick="choose('car',this)">🚘 سيارة</button>
 <button onclick="choose('moto',this)">🏍️ دراجة</button>
 <button onclick="choose('parcel',this)">📦 طرد</button>
 </div>
+
 <label>موقع الانطلاق</label>
-<input id="pickup" placeholder="اكتب موقع الانطلاق">
+<input id="pickup" placeholder="حدد الموقع على الخريطة">
+
 <label>الوجهة</label>
-<input id="destination" placeholder="اكتب وجهتك">
+<input id="destination" placeholder="حدد الوجهة على الخريطة">
+
+<p><small>اضغط على الخريطة أولاً لتحديد الانطلاق، ثم اضغط لتحديد الوجهة.</small></p>
+
 <div id="map"></div>
+
 <p class="result" id="price">السعر: --</p>
+
 <button onclick="calculate()">احسب السعر</button>
 <button onclick="order()">تأكيد الطلب</button>
-<p id="orderMessage"></p>
+
+<p id="orderMessage" class="message"></p>
 </div>
+
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
 <script>
-const firebaseConfig={
-apiKey:"AIzaSyDE_wyCpcoDStuUyNud9PiUPwezS83Xr00",
-authDomain:"tawsila-53870.firebaseapp.com",
-projectId:"tawsila-53870",
-storageBucket:"tawsila-53870.firebasestorage.app",
-messagingSenderId:"200480445099",
-appId:"1:200480445099:web:2be93d9778ba54c84b1dee"
+
+const firebaseConfig = {
+apiKey: "AIzaSyDE_wyCpcoDStuUyNud9PiUPwezS83Xr00",
+authDomain: "tawsila-53870.firebaseapp.com",
+projectId: "tawsila-53870",
+storageBucket: "tawsila-53870.firebasestorage.app",
+messagingSenderId: "200480445099",
+appId: "1:200480445099:web:2be93d9778ba54c84b1dee"
 };
 
 firebase.initializeApp(firebaseConfig);
-const auth=firebase.auth();
-const db=firebase.firestore();
 
-let confirmation=null;
-let service="car";
-let distance=0;
-let price=0;
-let user=null;
-let pickupPoint=null;
-let destinationPoint=null;
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+auth.languageCode = "ar";
+
+let confirmation = null;
+let verifier = null;
+let service = "car";
+let distance = 0;
+let price = 0;
+let user = null;
+let pickupPoint = null;
+let destinationPoint = null;
+let markers = [];
+
+auth.onAuthStateChanged(async function(currentUser){
+user = currentUser;
+if(user){
+document.getElementById("authMessage").innerText =
+"مرحباً بك! تم تسجيل الدخول برقم " + user.phoneNumber;
+}
+});
 
 function choose(type,button){
-service=type;
-document.querySelectorAll('.service button').forEach(b=>b.classList.remove('active'));
-button.classList.add('active');
+service = type;
+document.querySelectorAll(".service button").forEach(b=>{
+b.classList.remove("active");
+});
+button.classList.add("active");
+price = 0;
+document.getElementById("price").innerText = "السعر: --";
 }
 
-function login(){
-let phone=document.getElementById('phone').value.trim();
+async function login(){
+
+const phone = document.getElementById("phone").value.trim();
+const message = document.getElementById("authMessage");
+
 if(!/^\+2189\d{8}$/.test(phone)){
-document.getElementById('authMessage').innerText="اكتب الرقم بصيغة +2189XXXXXXXX";
+message.innerText = "اكتب الرقم بصيغة +2189XXXXXXXX";
 return;
 }
-const verifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'normal'});
-auth.signInWithPhoneNumber(phone,verifier)
-.then(result=>{
-confirmation=result;
-document.getElementById('verifyBox').style.display='block';
-document.getElementById('authMessage').innerText="تم إرسال الرمز";
-})
-.catch(e=>{
-document.getElementById('authMessage').innerText="خطأ: "+e.message;
-verifier.clear();
-});
+
+try{
+
+if(!verifier){
+verifier = new firebase.auth.RecaptchaVerifier(
+"recaptcha-container",
+{size:"normal"}
+);
+await verifier.render();
 }
 
-function verify(){
-confirmation.confirm(document.getElementById('otp').value.trim())
-.then(async result=>{
-user=result.user;
-await db.collection('users').doc(user.uid).set({
+document.getElementById("loginBtn").disabled = true;
+
+confirmation = await auth.signInWithPhoneNumber(phone,verifier);
+
+document.getElementById("verifyBox").style.display = "block";
+message.innerText = "تم إرسال رمز التحقق إلى هاتفك";
+
+}catch(e){
+message.innerText = "تعذر الإرسال: " + e.message;
+if(verifier){
+verifier.clear();
+verifier = null;
+}
+}finally{
+document.getElementById("loginBtn").disabled = false;
+}
+}
+
+async function verify(){
+
+try{
+
+if(!confirmation){
+throw new Error("أرسل رمز التحقق أولاً");
+}
+
+const code = document.getElementById("otp").value.trim();
+if(!code){
+throw new Error("أدخل رمز التحقق");
+}
+
+const result = await confirmation.confirm(code);
+user = result.user;
+
+await db.collection("users").doc(user.uid).set({
 name:"مستخدم توصيلة",
-email:user.phoneNumber,
+phone:user.phoneNumber,
 role:"customer",
 createdAt:firebase.firestore.FieldValue.serverTimestamp()
 },{merge:true});
-document.getElementById('authMessage').innerText="تم تسجيل الدخول بنجاح";
-})
-.catch(e=>document.getElementById('authMessage').innerText="خطأ: "+e.message);
+
+document.getElementById("authMessage").innerText =
+"تم تسجيل الدخول بنجاح";
+
+}catch(e){
+document.getElementById("authMessage").innerText =
+"خطأ: " + e.message;
+}
 }
 
-const map=L.map('map').setView([32.8872,13.1913],12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-attribution:'© OpenStreetMap'
+const map = L.map("map").setView([32.8872,13.1913],12);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+attribution:"© OpenStreetMap"
 }).addTo(map);
-let markers=[];
 
-map.on('click',e=>{
-if(!pickupPoint){
-pickupPoint=e.latlng;
-document.getElementById('pickup').value=e.latlng.lat.toFixed(5)+","+e.latlng.lng.toFixed(5);
+map.on("click",function(e){
+
+if(!pickupPoint || destinationPoint){
+pickupPoint = e.latlng;
+destinationPoint = null;
+
+document.getElementById("pickup").value =
+e.latlng.lat.toFixed(5)+","+e.latlng.lng.toFixed(5);
+
+document.getElementById("destination").value = "";
+document.getElementById("price").innerText = "السعر: --";
+price = 0;
+
 }else{
-destinationPoint=e.latlng;
-document.getElementById('destination').value=e.latlng.lat.toFixed(5)+","+e.latlng.lng.toFixed(5);
+destinationPoint = e.latlng;
+
+document.getElementById("destination").value =
+e.latlng.lat.toFixed(5)+","+e.latlng.lng.toFixed(5);
 }
+
 markers.forEach(m=>map.removeLayer(m));
-markers=[];
-if(pickupPoint)markers.push(L.marker(pickupPoint).addTo(map).bindPopup('الانطلاق'));
-if(destinationPoint)markers.push(L.marker(destinationPoint).addTo(map).bindPopup('الوجهة'));
+markers = [];
+
+if(pickupPoint){
+markers.push(
+L.marker(pickupPoint).addTo(map).bindPopup("الانطلاق")
+);
+}
+
+if(destinationPoint){
+markers.push(
+L.marker(destinationPoint).addTo(map).bindPopup("الوجهة")
+);
+}
 });
 
 async function calculate(){
-if(!pickupPoint||!destinationPoint){
-alert("اختر نقطتي الانطلاق والوجهة من الخريطة");
+
+if(!pickupPoint || !destinationPoint){
+alert("حدد الانطلاق والوجهة من الخريطة");
 return;
 }
+
 try{
-let url=`https://router.project-osrm.org/route/v1/driving/${pickupPoint.lng},${pickupPoint.lat};${destinationPoint.lng},${destinationPoint.lat}?overview=false`;
-let data=await fetch(url).then(r=>r.json());
-if(!data.routes?.length)throw Error("لم يتم العثور على مسار");
-distance=data.routes[0].distance/1000;
-let base=service==='car'?5:service==='moto'?3:4;
-let rate=service==='car'?1.5:service==='moto'?1:1.2;
-price=base+distance*rate;
-document.getElementById('price').innerText=
-"المسافة: "+distance.toFixed(1)+" كم | السعر التقريبي: "+price.toFixed(2)+" د.ل";
-}catch(e){alert("تعذر حساب المسافة، حاول مرة أخرى");}
+
+const url =
+https://router.project-osrm.org/route/v1/driving/${pickupPoint.lng},${pickupPoint.lat};${destinationPoint.lng},${destinationPoint.lat}?overview=false;
+
+const response = await fetch(url);
+const data = await response.json();
+
+if(!data.routes || !data.routes.length){
+throw new Error("لم يتم العثور على مسار");
+}
+
+distance = data.routes[0].distance / 1000;
+
+const base = service==="car" ? 5 : service==="moto" ? 3 : 4;
+const rate = service==="car" ? 1.5 : service==="moto" ? 1 : 1.2;
+
+price = base + distance * rate;
+
+document.getElementById("price").innerText =
+"المسافة: "+distance.toFixed(1)+
+" كم | السعر التقريبي: "+price.toFixed(2)+" د.ل";
+
+}catch(e){
+alert("تعذر حساب المسافة. حاول مرة أخرى.");
+}
 }
 
 async function order(){
-if(!user){alert("سجل الدخول أولاً");return;}
-if(!pickupPoint||!destinationPoint||!price){alert("احسب السعر أولاً");return;}
+
+if(!user){
+alert("سجل الدخول أولاً");
+return;
+}
+
+if(!pickupPoint || !destinationPoint || !price){
+alert("حدد المواقع واحسب السعر أولاً");
+return;
+}
+
 try{
-await db.collection('rides').add({
+
+await db.collection("rides").add({
+
 customerId:user.uid,
 service:service,
-pickup:document.getElementById('pickup').value,
-destination:document.getElementById('destination').value,
+pickup:document.getElementById("pickup").value,
+destination:document.getElementById("destination").value,
 distance:distance,
 price:price,
 status:"pending",
 createdAt:firebase.firestore.FieldValue.serverTimestamp()
+
 });
-document.getElementById('orderMessage').innerText="تم إرسال طلبك بنجاح";
-}catch(e){document.getElementById('orderMessage').innerText="تعذر إرسال الطلب: "+e.message;}
+
+document.getElementById("orderMessage").innerText =
+"تم إرسال طلبك بنجاح";
+
+}catch(e){
+
+document.getElementById("orderMessage").innerText =
+"تعذر إرسال الطلب: "+e.message;
+
 }
+}
+
 </script>
 </body>
 </html>
