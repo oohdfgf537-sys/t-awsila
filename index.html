@@ -1,116 +1,136 @@
+
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>توصيلة | Tawsila</title>
+<title>FERRARI | فيراري</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#08090b;color:#fff;font-family:Arial,sans-serif}
-:root{--gold:#d9b45b;--panel:#17191d}
-header{height:65px;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;background:#08090b;border-bottom:1px solid #44371e}
-.logo{font-size:25px;font-weight:bold;color:var(--gold)}
-.logo small{display:block;font-size:9px;letter-spacing:3px;color:#aaa}
-main{max-width:1100px;margin:auto;padding:14px}
-.hero{height:220px;border-radius:18px;overflow:hidden;position:relative;background:#17100e;margin-bottom:15px}
-.hero img{width:100%;height:100%;object-fit:cover;object-position:center 55%;opacity:.78}
-.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#08090b 0%,transparent 90%)}
-.heroText{position:absolute;z-index:2;top:25px;right:22px}
-.heroText h1{font-size:30px;color:#fff;margin:12px 0}
-.heroText p{color:#e4c77e}
-.gold{color:var(--gold)}
-.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}
-.card{background:var(--panel);border:1px solid #37312a;border-radius:16px;padding:17px;margin-bottom:14px}
-h2{font-size:19px;color:var(--gold);margin:0 0 14px}
-#map{height:490px;width:100%;border-radius:12px;background:#242424;z-index:1}
-label{display:block;margin:12px 0 7px;color:#ccc;font-size:14px}
-input{width:100%;padding:13px;border-radius:9px;border:1px solid #454545;background:#25272b;color:white;font-size:16px}
-button{background:linear-gradient(135deg,#f0d58c,#b88b39);border:0;color:#17120a;padding:13px;border-radius:9px;font-size:15px;font-weight:bold;width:100%;margin-top:10px;cursor:pointer}
-button.dark{background:#292b30;color:#fff;border:1px solid #555}
-.services{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.services button{background:#282a2e;color:#ddd;border:1px solid #444;padding:12px 4px}
-.services button.active{background:#48391d;color:#f0d58c;border-color:var(--gold)}
-.services span{display:block;font-size:24px;margin-bottom:6px}
-.price{padding:15px;text-align:center;background:#282116;border:1px solid #725b2b;border-radius:10px;color:var(--gold);font-size:19px;margin-top:13px}
-.msg{font-size:13px;color:var(--gold);line-height:1.7}
-.note{font-size:12px;color:#999;line-height:1.7}
-footer{text-align:center;color:#777;padding:22px}
-@media(max-width:720px){
-.layout{grid-template-columns:1fr}
-.hero{height:190px}
-.heroText h1{font-size:25px}
-#map{height:360px}
-}
+body{margin:0;font-family:Arial;background:#fff;color:#222}
+:root{--pink:#ed5b9b;--dark:#c93679;--pale:#fff0f6}
+button{border:0;cursor:pointer;font-family:inherit}
+#intro{min-height:100vh;background:linear-gradient(160deg,#fff 55%,#ffe1ed);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:45px 25px 35px;text-align:center}
+.brand{font-size:34px;font-weight:900;color:var(--pink);letter-spacing:2px}
+.brand small{display:block;font-size:13px;letter-spacing:5px;color:#777;margin-top:7px}
+.welcome-art{width:100%;max-width:360px;height:300px;display:flex;align-items:center;justify-content:center}
+.welcome-art svg{width:100%;height:100%}
+.intro-title{font-size:27px;margin:0 0 12px;color:#333}
+.intro-text{color:#777;line-height:1.8}
+.actions{width:100%;max-width:390px}
+.btn{width:100%;padding:16px;border-radius:14px;background:var(--pink);color:white;font-size:17px;font-weight:bold;margin-top:12px;box-shadow:0 6px 16px #ed5b9b33}
+.btn.light{background:white;color:var(--pink);border:1px solid var(--pink);box-shadow:none}
+#app{display:none;height:100dvh;position:relative;overflow:hidden;background:#fff}
+#map{position:absolute;inset:0 0 195px;z-index:1;background:#eee}
+.topbar{position:absolute;top:18px;right:16px;left:16px;z-index:500;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.topbar>*{pointer-events:auto}
+.round{width:58px;height:58px;border-radius:50%;background:#fff;box-shadow:0 3px 14px #0002;font-size:25px;color:#333}
+.wallet{border-radius:35px;background:white;padding:15px 20px;box-shadow:0 3px 14px #0002;font-weight:bold}
+.wallet b{color:var(--pink)}
+.sheet{position:absolute;bottom:0;right:0;left:0;z-index:600;background:white;border-radius:23px 23px 0 0;padding:17px 16px 25px;box-shadow:0 -5px 25px #0001}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}
+.sheet-head h2{margin:0;font-size:24px}
+.car-icon{font-size:38px}
+.location-row{display:grid;grid-template-columns:1fr 1fr 62px;gap:9px}
+.location-btn{background:#fff;border:1px solid #eee;border-radius:13px;padding:13px 5px;font-size:14px;box-shadow:0 3px 9px #0001}
+.location-btn span{display:block;font-size:22px;margin-bottom:5px}
+.add-btn{border-radius:50%;background:var(--pink);color:white;font-size:32px;box-shadow:0 4px 12px #ed5b9b44}
+.request{width:100%;margin-top:13px;padding:15px;border-radius:13px;background:var(--pink);color:#fff;font-size:17px;font-weight:bold}
+.small{font-size:12px;color:#999;text-align:center;margin:9px 0 0}
+.panel{position:absolute;z-index:800;top:0;bottom:0;right:0;width:min(310px,85%);background:white;box-shadow:-5px 0 25px #0002;padding:25px;transform:translateX(110%);transition:.25s}
+.panel.open{transform:translateX(0)}
+.panel h2{color:var(--pink)}
+.panel button{display:block;width:100%;padding:16px;background:#fff5f9;margin:9px 0;border-radius:12px;text-align:right;color:#333}
+#loginBox{display:none;position:absolute;z-index:900;inset:0;background:#fff;padding:35px 22px;overflow:auto}
+#loginBox h2{color:var(--pink)}
+input{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;margin:8px 0 14px;font-size:16px}
+#message{color:var(--pink);font-size:14px}
+.leaflet-control-attribution{font-size:9px!important}
+@media(min-width:700px){.sheet{left:50%;right:0;max-width:500px}.topbar{left:20px;right:20px}}
 </style>
 </head>
 <body>
-<header>
-<div class="logo">توصيلة<small>TAWSILA LUXURY</small></div>
-<div class="gold">رحلتك تبدأ هنا</div>
-</header>
 
-<main>
-<section class="hero">
-<img src="https://commons.wikimedia.org/wiki/Special:FilePath/RED-Ferrari.jpg" alt="سيارة فيراري حمراء">
-<div class="heroText">
-<div class="gold">TAWSILA PREMIUM</div>
-<h1>تنقّل بمستوى آخر</h1>
-<p>راحة • سرعة • أمان</p>
-</div>
+<section id="intro">
+ <div class="brand">FERRARI<small>فيراري</small></div>
+ <div class="welcome-art">
+  <svg viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg">
+   <circle cx="180" cy="145" r="120" fill="#ffe5ef"/>
+   <circle cx="180" cy="145" r="95" fill="#fff4f8"/>
+   <path d="M47 190 Q75 160 105 176 L140 132 Q155 116 194 124 L239 143 Q265 151 285 183 L311 194 L307 215 L50 215Z" fill="#ed5b9b"/>
+   <path d="M130 166 L153 135 Q162 126 190 132 L231 147 L251 169Z" fill="#f9d5e5"/>
+   <path d="M155 136 L190 132 L193 167 L130 167Z" fill="#d5e8ef"/>
+   <path d="M197 133 L230 147 L251 169 L197 169Z" fill="#c6dce5"/>
+   <circle cx="105" cy="211" r="22" fill="#333"/><circle cx="105" cy="211" r="10" fill="#ddd"/>
+   <circle cx="267" cy="211" r="22" fill="#333"/><circle cx="267" cy="211" r="10" fill="#ddd"/>
+   <path d="M54 190 L83 183 L91 199 L54 201Z" fill="#fff4f8"/>
+   <path d="M286 186 L307 195 L304 204 L285 199Z" fill="#fff4f8"/>
+   <path d="M80 234 Q180 260 290 234" stroke="#ed5b9b" stroke-width="3" fill="none" opacity=".3"/>
+  </svg>
+ </div>
+ <div>
+  <h1 class="intro-title">مرحباً بك في فيراري</h1>
+  <p class="intro-text">رحلتك تبدأ بضغطة زر<br>تنقل بسهولة وراحة في مدينتك</p>
+ </div>
+ <div class="actions">
+  <button class="btn" onclick="showLogin()">تسجيل الدخول</button>
+  <button class="btn light" onclick="showLogin()">التسجيل</button>
+  <button class="btn light" onclick="openApp()">استكشاف التطبيق</button>
+ </div>
 </section>
 
-<div class="layout">
-<section class="card">
-<h2>حدد رحلتك على الخريطة</h2>
-<div id="map"></div>
-<p class="note">اضغط على الخريطة مرة لتحديد الانطلاق ومرة ثانية لتحديد الوجهة.</p>
-<button class="dark" onclick="resetMap()">مسح المواقع والبدء من جديد</button>
-</section>
+<section id="app">
+ <div id="map"></div>
+ <div class="topbar">
+  <button class="round" onclick="toggleMenu()">☰</button>
+  <div class="wallet">الرصيد: <b>0 LYD</b>　▣</div>
+ </div>
 
-<div>
-<section class="card">
-<h2>احجز رحلتك</h2>
-<div class="services">
-<button class="active" onclick="choose('car',this)"><span>🚘</span>سيارة</button>
-<button onclick="choose('moto',this)"><span>🏍️</span>دراجة</button>
-<button onclick="choose('parcel',this)"><span>📦</span>طرود</button>
-</div>
-<label>موقع الانطلاق</label>
-<input id="pickup" placeholder="اختر من الخريطة" readonly>
-<label>الوجهة</label>
-<input id="destination" placeholder="اختر من الخريطة" readonly>
-<div class="price" id="price">السعر: -- د.ل</div>
-<button onclick="calculate()">احسب السعر والمسافة</button>
-<button onclick="order()">تأكيد طلب الرحلة</button>
-<p id="orderMessage" class="msg"></p>
-</section>
+ <aside class="panel" id="menu">
+  <h2>FERRARI</h2>
+  <button onclick="showLogin()">👤 حسابي وتسجيل الدخول</button>
+  <button onclick="alert('ستظهر رحلاتك هنا بعد تسجيل الدخول')">🚘 رحلاتي</button>
+  <button onclick="alert('المحفظة ستتوفر بعد تفعيل الدفع')">💳 محفظتي</button>
+  <button onclick="closeMenu()">إغلاق القائمة ✕</button>
+ </aside>
 
-<section class="card" id="loginCard">
-<h2>حسابك في توصيلة</h2>
-<p class="note" id="loginStatus">سجل الدخول برقم هاتفك لإرسال الطلب.</p>
-<label>رقم الهاتف بصيغة دولية</label>
-<input id="phone" placeholder="+2189XXXXXXXX" type="tel">
-<div id="recaptcha-container"></div>
-<button onclick="login()" id="loginBtn">إرسال رمز التحقق</button>
-<div id="verifyBox" hidden>
-<label>رمز الرسالة</label>
-<input id="otp" placeholder="رمز التحقق" inputmode="numeric">
-<button onclick="verify()">تأكيد الدخول</button>
-</div>
-<p id="authMessage" class="msg"></p>
-</section>
-</div>
-</div>
-</main>
+ <div class="sheet">
+  <div class="sheet-head">
+   <h2>طلب رحلة</h2>
+   <div class="car-icon">🚘</div>
+  </div>
+  <div class="location-row">
+   <button class="location-btn" onclick="savePlace('home')"><span>⌂</span>إضافة المنزل</button>
+   <button class="location-btn" onclick="savePlace('work')"><span>▣</span>إضافة مكان العمل</button>
+   <button class="add-btn" onclick="resetPoints()">+</button>
+  </div>
+  <button class="request" onclick="requestRide()">اطلب رحلتك الآن</button>
+  <p class="small" id="mapStatus">اضغط على الخريطة لتحديد موقع الانطلاق والوجهة</p>
+ </div>
 
-<footer>TAWSILA © 2026</footer>
+ <div id="loginBox">
+  <button class="round" onclick="closeLogin()">←</button>
+  <h2>مرحباً بك في فيراري</h2>
+  <p>سجل الدخول برقم هاتفك</p>
+  <label>رقم الهاتف</label>
+  <input id="phone" placeholder="+2189XXXXXXXX" type="tel">
+  <div id="recaptcha-container"></div>
+  <button class="btn" onclick="sendCode()">إرسال رمز التحقق</button>
+  <div id="verifyBox" hidden>
+   <label>رمز الرسالة</label>
+   <input id="otp" placeholder="رمز التحقق" inputmode="numeric">
+   <button class="btn" onclick="verifyCode()">تأكيد</button>
+  </div>
+  <p id="message"></p>
+ </div>
+</section>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
 <script>
 const firebaseConfig={
 apiKey:"AIzaSyDE_wyCpcoDStuUyNud9PiUPwezS83Xr00",
@@ -121,141 +141,112 @@ messagingSenderId:"200480445099",
 appId:"1:200480445099:web:2be93d9778ba54c84b1dee"
 };
 
-firebase.initializeApp(firebaseConfig);
-const auth=firebase.auth();
-const db=firebase.firestore();
-
-let user=null,confirmation=null,verifier=null;
-let service="car",start=null,end=null,distance=0,price=0;
-let markers=[],routeLine=null;
-
-auth.onAuthStateChanged(u=>{
-user=u;
-document.getElementById("loginStatus").innerText=
-u?"تم تسجيل الدخول بنجاح":"سجل الدخول برقم هاتفك لإرسال الطلب.";
-});
-
-const map=L.map("map").setView([32.8872,13.1913],13);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-maxZoom:19,
-attribution:"© OpenStreetMap"
-}).addTo(map);
-
-setTimeout(()=>map.invalidateSize(),500);
-
-map.on("click",e=>{
-if(!start || end){
-resetMap();
-start=e.latlng;
-document.getElementById("pickup").value=
-start.lat.toFixed(5)+","+start.lng.toFixed(5);
-markers.push(L.marker(start).addTo(map).bindPopup("موقع الانطلاق").openPopup());
-}else{
-end=e.latlng;
-document.getElementById("destination").value=
-end.lat.toFixed(5)+","+end.lng.toFixed(5);
-markers.push(L.marker(end).addTo(map).bindPopup("الوجهة"));
-map.fitBounds(L.latLngBounds(start,end),{padding:[35,35]});
-}
-price=0;
-document.getElementById("price").innerText="السعر: -- د.ل";
-});
-
-function resetMap(){
-markers.forEach(m=>map.removeLayer(m));
-markers=[];
-if(routeLine)map.removeLayer(routeLine);
-routeLine=null;start=null;end=null;price=0;distance=0;
-document.getElementById("pickup").value="";
-document.getElementById("destination").value="";
-document.getElementById("price").innerText="السعر: -- د.ل";
-}
-
-function choose(type,btn){
-service=type;
-document.querySelectorAll(".services button").forEach(b=>b.classList.remove("active"));
-btn.classList.add("active");
-price=0;
-document.getElementById("price").innerText="السعر: -- د.ل";
-}
-
-async function calculate(){
-if(!start||!end){alert("حدد الانطلاق والوجهة من الخريطة");return}
+let auth=null,db=null,user=null,confirmation=null,verifier=null;
 try{
-const url=`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
-const res=await fetch(url);
-const data=await res.json();
-if(!data.routes?.length)throw Error("لم يتم العثور على مسار");
-distance=data.routes[0].distance/1000;
-const base=service==="car"?5:service==="moto"?3:4;
-const rate=service==="car"?1.5:service==="moto"?1:1.2;
-price=base+distance*rate;
-if(routeLine)map.removeLayer(routeLine);
-routeLine=L.geoJSON(data.routes[0].geometry,{style:{color:"#d9b45b",weight:5}}).addTo(map);
-document.getElementById("price").innerText=
-distance.toFixed(1)+" كم | "+price.toFixed(2)+" د.ل تقريباً";
-}catch(e){alert("تعذر حساب المسار. حاول مرة أخرى")}
+ firebase.initializeApp(firebaseConfig);
+ auth=firebase.auth();db=firebase.firestore();
+ auth.onAuthStateChanged(u=>{user=u});
+}catch(e){console.log(e)}
+
+let map=null,start=null,end=null,markers=[],route=null;
+
+function openApp(){
+ document.getElementById("intro").style.display="none";
+ document.getElementById("app").style.display="block";
+ if(!map){
+  map=L.map("map",{zoomControl:false}).setView([32.8872,13.1913],13);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{
+   attribution:"© OpenStreetMap © CARTO",maxZoom:20
+  }).addTo(map);
+  L.control.zoom({position:"bottomright"}).addTo(map);
+  map.on("click",choosePoint);
+ }
+ setTimeout(()=>map.invalidateSize(),300);
 }
 
-async function login(){
-const phone=document.getElementById("phone").value.trim();
-const msg=document.getElementById("authMessage");
-if(!/^\+2189\d{8}$/.test(phone)){
-msg.innerText="اكتب رقمك بصيغة +2189XXXXXXXX";return;
+function showLogin(){
+ openApp();
+ document.getElementById("loginBox").style.display="block";
 }
-try{
-document.getElementById("loginBtn").disabled=true;
-if(!verifier){
-verifier=new firebase.auth.RecaptchaVerifier("recaptcha-container",{size:"normal"});
-await verifier.render();
-}
-confirmation=await auth.signInWithPhoneNumber(phone,verifier);
-document.getElementById("verifyBox").hidden=false;
-msg.innerText="أرسلنا رمز التحقق إلى هاتفك";
-}catch(e){
-msg.innerText="تعذر الإرسال: "+e.message;
-if(verifier){verifier.clear();verifier=null}
-}finally{
-document.getElementById("loginBtn").disabled=false;
-}
-}
+function closeLogin(){document.getElementById("loginBox").style.display="none"}
+function toggleMenu(){document.getElementById("menu").classList.toggle("open")}
+function closeMenu(){document.getElementById("menu").classList.remove("open")}
 
-async function verify(){
-try{
-const code=document.getElementById("otp").value.trim();
-const result=await confirmation.confirm(code);
-user=result.user;
-await db.collection("users").doc(user.uid).set({
-phone:user.phoneNumber,role:"customer",
-createdAt:firebase.firestore.FieldValue.serverTimestamp()
-},{merge:true});
-document.getElementById("authMessage").innerText="تم تسجيل الدخول بنجاح";
-}catch(e){
-document.getElementById("authMessage").innerText="رمز غير صحيح أو حدث خطأ: "+e.message;
+function choosePoint(e){
+ if(!start || end){
+  resetPoints();
+  start=e.latlng;
+  markers.push(L.marker(start).addTo(map).bindPopup("موقع الانطلاق").openPopup());
+  document.getElementById("mapStatus").innerText="تم تحديد الانطلاق، اختر الوجهة";
+ }else{
+  end=e.latlng;
+  markers.push(L.marker(end).addTo(map).bindPopup("الوجهة"));
+  map.fitBounds(L.latLngBounds(start,end),{padding:[35,35]});
+  document.getElementById("mapStatus").innerText="تم تحديد الموقعين، اضغط طلب رحلتك";
+ }
 }
+function resetPoints(){
+ markers.forEach(m=>map.removeLayer(m));markers=[];
+ if(route){map.removeLayer(route);route=null}
+ start=null;end=null;
+ document.getElementById("mapStatus").innerText="اختر موقع الانطلاق ثم الوجهة من الخريطة";
 }
-
-async function order(){
-if(!user){alert("سجل الدخول أولاً");return}
-if(!start||!end||!price){alert("حدد الموقعين واحسب السعر أولاً");return}
-try{
-await db.collection("rides").add({
-customerId:user.uid,
-service:service,
-pickup:document.getElementById("pickup").value,
-destination:document.getElementById("destination").value,
-distance:distance,
-price:price,
-status:"pending",
-createdAt:firebase.firestore.FieldValue.serverTimestamp()
-});
-document.getElementById("orderMessage").innerText="تم إرسال طلبك بنجاح";
-}catch(e){
-document.getElementById("orderMessage").innerText="تعذر إرسال الطلب: "+e.message;
+function savePlace(type){
+ if(!start){alert("حدد موقع الانطلاق أولاً");return}
+ const key=type==="home"?"منزلي":"مكان عملي";
+ localStorage.setItem(key,JSON.stringify([start.lat,start.lng]));
+ alert("تم حفظ "+key+" على هذا الجهاز");
 }
+async function requestRide(){
+ if(!user){showLogin();return}
+ if(!start||!end){alert("حدد موقع الانطلاق والوجهة على الخريطة");return}
+ try{
+  const response=await fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=false`);
+  const data=await response.json();
+  if(!data.routes?.length)throw Error();
+  const km=data.routes[0].distance/1000;
+  const estimate=5+km*1.5;
+  await db.collection("rides").add({
+   customerId:user.uid,
+   service:"car",
+   pickup:`${start.lat},${start.lng}`,
+   destination:`${end.lat},${end.lng}`,
+   distance:km,price:estimate,status:"pending",
+   createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
+  alert("تم إرسال طلبك. السعر التقديري "+estimate.toFixed(2)+" دينار");
+ }catch(e){alert("تعذر إرسال الطلب. تحقق من الاتصال وإعدادات Firebase")}
+}
+async function sendCode(){
+ const phone=document.getElementById("phone").value.trim();
+ const msg=document.getElementById("message");
+ if(!auth){msg.innerText="تعذر الاتصال بخدمة تسجيل الدخول";return}
+ if(!/^\+2189\d{8}$/.test(phone)){msg.innerText="اكتب الرقم بصيغة +2189XXXXXXXX";return}
+ try{
+  if(!verifier){
+   verifier=new firebase.auth.RecaptchaVerifier("recaptcha-container",{size:"normal"});
+   await verifier.render();
+  }
+  confirmation=await auth.signInWithPhoneNumber(phone,verifier);
+  document.getElementById("verifyBox").hidden=false;
+  msg.innerText="أرسلنا رمز التحقق إلى هاتفك";
+ }catch(e){
+  msg.innerText="تعذر الإرسال: "+e.message;
+  if(verifier){verifier.clear();verifier=null}
+ }
+}
+async function verifyCode(){
+ try{
+  const result=await confirmation.confirm(document.getElementById("otp").value.trim());
+  user=result.user;
+  await db.collection("users").doc(user.uid).set({
+   phone:user.phoneNumber,role:"customer",
+   createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  },{merge:true});
+  document.getElementById("message").innerText="تم تسجيل الدخول بنجاح";
+  setTimeout(closeLogin,1000);
+ }catch(e){document.getElementById("message").innerText="رمز التحقق غير صحيح أو حدث خطأ"}
 }
 </script>
 </body>
 </html>
-إنشاء
-
