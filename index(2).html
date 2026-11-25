@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>FERRARI | فيراري</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box} :root{--pink:#ed1675;--deep:#c91662;--pale:#fff0f6}
+html,body{margin:0;width:100%;height:100%;font-family:Arial,sans-serif;color:#29252a;background:#fff}button{border:0;cursor:pointer;font-family:inherit}
+/* شاشة البداية: الصورة المصممة مع أزرار تفاعلية فوقها */
+#intro{position:fixed;inset:0;z-index:1000;background:#ffe5ef;overflow:hidden}
+#intro-art{width:100%;height:100%;object-fit:fill;display:block}
+.intro-hit{position:absolute;right:10%;width:80%;height:7.2%;background:transparent;border-radius:50px;z-index:2}
+#login-hit{top:68.2%}#signup-hit{top:76.4%}#explore-hit{top:84.5%}
+/* التطبيق والخريطة */
+#app{display:none;height:100dvh;position:relative;overflow:hidden;background:#f8f8f8}
+#map{position:absolute;inset:0 0 190px;z-index:1;background:#eee}
+.locate-btn{position:absolute;z-index:550;left:16px;top:88px;width:49px;height:49px;border-radius:50%;background:#fff;color:var(--pink);font-size:22px;box-shadow:0 3px 15px #0002}
+.car-pin{font-size:25px;filter:drop-shadow(0 2px 3px #0005);transform:translate(-50%,-50%);white-space:nowrap}
+.map-hint{position:absolute;z-index:550;top:148px;left:12px;background:#fff;padding:8px 11px;border-radius:12px;font-size:11px;color:#777;box-shadow:0 2px 10px #0002}
+.top{position:absolute;top:16px;right:15px;left:15px;z-index:500;display:flex;justify-content:space-between;align-items:center}
+.circle{width:53px;height:53px;border-radius:50%;background:white;box-shadow:0 3px 15px #0002;font-size:23px;color:var(--pink)}
+.wallet{padding:15px 17px;border-radius:30px;background:white;box-shadow:0 3px 15px #0002;font-weight:bold}.wallet b{color:var(--pink)}
+.sheet{position:absolute;bottom:0;right:0;left:0;z-index:600;background:white;border-radius:25px 25px 0 0;padding:18px 17px 24px;box-shadow:0 -5px 25px #0001}
+.sheet-title{display:flex;justify-content:space-between;align-items:center}.sheet-title h2{font-size:22px;margin:0}.car-small{font-size:34px}
+.options{display:grid;grid-template-columns:1fr 1fr 55px;gap:9px;margin-top:15px}
+.option{background:#fff5f9;border:1px solid #f4d8e5;border-radius:13px;padding:12px 4px;color:#444;font-size:13px}.option span{display:block;font-size:22px;margin-bottom:5px}
+.add{background:var(--pink);color:white;border-radius:50%;font-size:30px}.request{width:100%;background:linear-gradient(90deg,#f52b88,#d91669);color:white;border-radius:14px;padding:16px;margin-top:13px;font-size:17px;font-weight:bold;box-shadow:0 5px 14px #ed579744}
+.note{text-align:center;font-size:12px;margin:8px 0 0;color:#888}
+#menu{position:absolute;z-index:800;top:0;bottom:0;right:0;width:290px;max-width:85vw;background:white;padding:25px;box-shadow:-5px 0 25px #0002;transform:translateX(110%);transition:.2s}#menu.open{transform:translateX(0)}
+#menu h2{color:var(--pink)}.menuitem{display:block;width:100%;padding:16px;margin:9px 0;text-align:right;border-radius:12px;background:#fff1f7;color:#333}
+#login{display:none;position:absolute;z-index:900;inset:0;background:white;padding:25px;overflow:auto}#login h2{color:var(--pink)}
+input{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;margin:9px 0;font-size:16px}.btn{width:100%;padding:16px;background:var(--pink);color:white;border-radius:13px;font-size:17px;font-weight:bold;margin-top:12px}.msg{color:var(--pink);font-size:14px;overflow-wrap:anywhere;line-height:1.6}
+@media(min-width:750px){#intro{background:#fff0f6}#intro-art{object-fit:contain}.sheet{left:auto;width:430px;bottom:20px;right:20px;border-radius:22px}#map{inset:0}.locate-btn{top:90px}}
+</style>
+</head>
+<body>
+<section id="intro" aria-label="واجهة فيراري الافتتاحية">
+ <img id="intro-art" src="ferrari-cover.png" alt="واجهة فيراري الوردية مع سيارة حمراء في طرابلس">
+ <button id="login-hit" class="intro-hit" aria-label="تسجيل الدخول" onclick="showLogin()"></button>
+ <button id="signup-hit" class="intro-hit" aria-label="إنشاء حساب" onclick="showLogin()"></button>
+ <button id="explore-hit" class="intro-hit" aria-label="استكشاف التطبيق" onclick="openApp()"></button>
+</section>
+<section id="app">
+ <div id="map"></div>
+ <button class="locate-btn" onclick="locateMe()" aria-label="موقعي الحالي">◎</button><div class="map-hint">🚘 سيارات قريبة على الخريطة</div>
+ <div class="top"><button class="circle" onclick="toggleMenu()">☰</button><div class="wallet">رصيدي: <b>0 د.ل</b></div></div>
+ <aside id="menu"><h2>FERRARI | فيراري</h2>
+  <button class="menuitem" onclick="showLogin()">👤 حسابي</button>
+  <button class="menuitem" onclick="alert('ستظهر رحلاتك هنا')">🚘 رحلاتي</button>
+  <button class="menuitem" onclick="alert('المحفظة ستتوفر بعد تفعيل الدفع')">💳 محفظتي</button>
+  <button class="menuitem" onclick="toggleMenu()">إغلاق ✕</button>
+ </aside>
+ <div class="sheet"><div class="sheet-title"><h2>إلى أين تريد الذهاب؟</h2><div class="car-small">🚘</div></div>
+  <div class="options"><button class="option" onclick="savePlace('home')"><span>⌂</span>المنزل</button><button class="option" onclick="savePlace('work')"><span>▣</span>مكان العمل</button><button class="add" onclick="resetMap()">+</button></div>
+  <button class="request" onclick="requestRide()">اطلب رحلتك الآن</button><p class="note" id="status">حدد موقع الانطلاق والوجهة بالضغط على الخريطة</p>
+ </div>
+ <div id="login"><button class="circle" onclick="closeLogin()">←</button><h2>تسجيل الدخول</h2><p>أدخل رقم هاتفك الليبي</p>
+  <input id="phone" type="tel" placeholder="+2189XXXXXXXX"><div id="recaptcha-container"></div>
+  <button class="btn" onclick="sendCode()">إرسال رمز التحقق</button>
+  <div id="verifyBox" hidden><input id="otp" placeholder="رمز التحقق" inputmode="numeric"><button class="btn" onclick="verifyCode()">تأكيد</button></div><p class="msg" id="message"></p>
+ </div>
+</section>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig={apiKey:"AIzaSyDE_wyCpcoDStuUyNud9PiUPwezS83Xr00",authDomain:"tawsila-53870.firebaseapp.com",projectId:"tawsila-53870",storageBucket:"tawsila-53870.firebasestorage.app",messagingSenderId:"200480445099",appId:"1:200480445099:web:2be93d9778ba54c84b1dee"};
+let auth=null,db=null,user=null,confirmation=null,verifier=null;
+try{firebase.initializeApp(firebaseConfig);auth=firebase.auth();db=firebase.firestore();auth.onAuthStateChanged(u=>user=u)}catch(e){console.log(e)}
+let map=null,start=null,end=null,markers=[],route=null,userMarker=null,nearbyCars=[],carTimer=null;
+function openApp(){document.getElementById('intro').style.display='none';document.getElementById('app').style.display='block';if(!map){map=L.map('map').setView([32.8872,13.1913],13);L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:20}).addTo(map);L.control.zoom({position:'bottomright'}).addTo(map);map.on('click',selectPoint);addNearbyCars();}setTimeout(()=>map.invalidateSize(),300)}
+function locateMe(){
+ if(!navigator.geolocation){alert('تحديد الموقع غير مدعوم في هذا المتصفح');return}
+ document.getElementById('status').innerText='جارٍ تحديد موقعك…';
+ navigator.geolocation.getCurrentPosition(pos=>{
+  const ll=L.latLng(pos.coords.latitude,pos.coords.longitude);
+  if(userMarker)map.removeLayer(userMarker);
+  userMarker=L.circleMarker(ll,{radius:9,color:'#fff',weight:3,fillColor:'#ed1675',fillOpacity:1}).addTo(map).bindPopup('موقعك الحالي');
+  map.setView(ll,16);start=ll;
+  document.getElementById('status').innerText='تم تحديد موقع الانطلاق. اضغط على الخريطة لاختيار الوجهة';
+ },()=>{document.getElementById('status').innerText='تعذر تحديد الموقع. اسمح للمتصفح بالوصول إلى موقعك';},{enableHighAccuracy:true,timeout:12000});
+}
+function addNearbyCars(){
+ const center=map.getCenter();
+ const offsets=[[.009,.012],[-.012,.006],[.006,-.014],[-.008,-.012]];
+ const icons=['🚘','🚗','🏎️','🚙'];
+ nearbyCars=offsets.map((o,i)=>{const marker=L.marker([center.lat+o[0],center.lng+o[1]],{icon:L.divIcon({className:'',html:`<div class="car-pin">${icons[i]}</div>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(map);return {marker,i,base:[center.lat+o[0],center.lng+o[1]]}});
+ if(carTimer)clearInterval(carTimer);let step=0;
+ carTimer=setInterval(()=>{if(!map||!document.getElementById('app')||document.getElementById('app').style.display==='none')return;step+=1;nearbyCars.forEach(c=>{const a=step*.00045*(c.i%2?1:-1);c.marker.setLatLng([c.base[0]+Math.sin(step/7+c.i)*.0015+a,c.base[1]+Math.cos(step/8+c.i)*.0018]);});},900);
+}
+function showLogin(){openApp();document.getElementById('login').style.display='block'}function closeLogin(){document.getElementById('login').style.display='none'}function toggleMenu(){document.getElementById('menu').classList.toggle('open')}
+function selectPoint(e){if(!start||end){resetMap();start=e.latlng;markers.push(L.marker(start).addTo(map).bindPopup('الانطلاق').openPopup());document.getElementById('status').innerText='تم تحديد الانطلاق، اختر الوجهة'}else{end=e.latlng;markers.push(L.marker(end).addTo(map).bindPopup('الوجهة'));map.fitBounds(L.latLngBounds(start,end),{padding:[30,30]});document.getElementById('status').innerText='تم تحديد الوجهة، اطلب رحلتك الآن'}}
+function resetMap(){if(!map)return;markers.forEach(m=>map.removeLayer(m));markers=[];start=null;end=null;if(route){map.removeLayer(route);route=null}if(userMarker){map.removeLayer(userMarker);userMarker=null}document.getElementById('status').innerText='حدد موقع الانطلاق والوجهة بالضغط على الخريطة'}
+function savePlace(type){if(!start){alert('حدد موقع الانطلاق أولاً');return}localStorage.setItem(type,JSON.stringify([start.lat,start.lng]));alert('تم حفظ الموقع على هذا الجهاز')}
+async function requestRide(){if(!user){showLogin();return}if(!start||!end){alert('حدد الانطلاق والوجهة على الخريطة');return}if(!db){alert('قاعدة البيانات غير متاحة حالياً');return}try{const url=`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;const response=await fetch(url);const data=await response.json();if(!data.routes?.length)throw Error('لم يتم العثور على مسار');const km=data.routes[0].distance/1000;const price=5+km*1.5;if(route)map.removeLayer(route);route=L.geoJSON(data.routes[0].geometry,{style:{color:'#ed1675',weight:5}}).addTo(map);await db.collection('rides').add({customerId:user.uid,service:'car',pickup:`${start.lat},${start.lng}`,destination:`${end.lat},${end.lng}`,distance:km,price:price,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});alert('تم إرسال طلب الرحلة. السعر التقريبي: '+price.toFixed(2)+' د.ل')}catch(e){alert('تعذر إرسال الطلب: '+(e.message||e))}}
+async function sendCode(){
+ const phone=document.getElementById('phone').value.trim();
+ const msg=document.getElementById('message');
+ const verifyBox=document.getElementById('verifyBox');
+ msg.innerText='';
+ verifyBox.hidden=true;
+ confirmation=null;
+ if(!auth){msg.innerText='خدمة الدخول غير متاحة. تحقق من اتصال Firebase.';return}
+ if(!/^\+2189\d{8}$/.test(phone)){msg.innerText='اكتب الرقم بصيغة +2189XXXXXXXX';return}
+ try{
+  if(!verifier){
+   verifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'normal'});
+  }
+  await verifier.render();
+  confirmation=await auth.signInWithPhoneNumber(phone,verifier);
+  verifyBox.hidden=false;
+  msg.innerText='تم تجهيز التحقق. أدخل رمز الاختبار المسجل في Firebase.';
+ }catch(e){
+  confirmation=null;
+  msg.innerText='تعذر الإرسال: '+(e.code||'')+' — '+(e.message||String(e));
+  if(verifier){try{verifier.clear()}catch(ignore){}verifier=null}
+ }
+}
+async function verifyCode(){
+ const msg=document.getElementById('message');
+ const code=document.getElementById('otp').value.trim();
+ if(!confirmation){msg.innerText='لم تبدأ عملية التحقق. اضغط إرسال رمز التحقق أولاً.';return}
+ if(!code){msg.innerText='أدخل رمز التحقق.';return}
+ let result;
+ try{
+  result=await confirmation.confirm(code);
+  user=result.user;
+ }catch(e){
+  msg.innerText='فشل تأكيد الرمز: '+(e.code||'')+' — '+(e.message||String(e));
+  return;
+ }
+ msg.innerText='تم تسجيل الدخول بنجاح.';
+ if(db){
+  try{
+   await db.collection('users').doc(user.uid).set({
+    phone:user.phoneNumber,
+    role:'customer',
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+   },{merge:true});
+  }catch(e){
+   msg.innerText='تم تسجيل الدخول، لكن تعذر حفظ بيانات الحساب: '+(e.code||'')+' — '+(e.message||String(e));
+  }
+ }
+ setTimeout(closeLogin,1800);
+}
+</script>
+</body>
+</html>
