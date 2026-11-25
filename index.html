@@ -45,7 +45,6 @@ button{border:0;cursor:pointer;font-family:inherit}
 .search-results{margin-top:5px}
 .search-result{display:block;width:100%;text-align:right;background:#fff5f9;border:1px solid #f2dce6;border-radius:10px;padding:11px;margin-top:6px;font-size:13px;line-height:1.6;color:#333}
 .search-result:active{background:#ffe3ef}
-.search-hint{font-size:11px;color:#888;margin:5px 2px}
 .options{display:grid;grid-template-columns:1fr 1fr 55px;gap:9px;margin-top:13px}
 .option{background:#fff5f9;border:1px solid #f4d8e5;border-radius:13px;padding:11px 4px;color:#444;font-size:13px}
 .option span{display:block;font-size:22px;margin-bottom:5px}
@@ -66,7 +65,10 @@ input,select{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;ma
 .card p{margin:6px 0;font-size:14px;line-height:1.6}
 .small-btn{padding:10px 14px;background:var(--pink);color:white;border-radius:10px;margin-top:8px}
 .hidden{display:none!important}
-#recaptcha-container{margin:8px 0}
+.auth-switch{display:flex;gap:8px;margin:12px 0}
+.auth-switch button{flex:1;padding:12px;border-radius:10px;background:#fff0f6;color:#333}
+.auth-switch button.active{background:var(--pink);color:white}
+.auth-help{font-size:13px;color:#777;line-height:1.7}
 @media(min-width:750px){
  #intro{background:#fff0f6}
  #intro-art{object-fit:contain}
@@ -81,8 +83,8 @@ input,select{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;ma
 
 <section id="intro">
  <img id="intro-art" src="ferrari-cover.png" alt="فيراري">
- <button id="login-hit" class="intro-hit" onclick="showLogin()"></button>
- <button id="signup-hit" class="intro-hit" onclick="showLogin()"></button>
+ <button id="login-hit" class="intro-hit" onclick="showLogin('login')"></button>
+ <button id="signup-hit" class="intro-hit" onclick="showLogin('register')"></button>
  <button id="explore-hit" class="intro-hit" onclick="openApp()"></button>
 </section>
 
@@ -111,7 +113,6 @@ input,select{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;ma
    <div class="car-small">🚘</div>
   </div>
 
-  <!-- بحث نقطة الانطلاق -->
   <div class="search-section">
    <label class="search-label">📍 البحث عن نقطة الانطلاق</label>
    <div class="search-row">
@@ -121,7 +122,6 @@ input,select{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;ma
    <div id="pickupResults" class="search-results"></div>
   </div>
 
-  <!-- بحث الوجهة بشكل مستقل -->
   <div class="search-section">
    <label class="search-label">🏁 البحث عن الوجهة</label>
    <div class="search-row">
@@ -142,19 +142,34 @@ input,select{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;ma
  </div>
 </section>
 
+<!-- تسجيل الدخول بالبريد -->
 <section id="login" class="panel">
  <div class="panel-head">
   <button class="circle" onclick="closeLogin()">←</button>
-  <h2>تسجيل الدخول</h2>
+  <h2 id="authTitle">تسجيل الدخول</h2>
  </div>
- <p>أدخل رقم هاتفك مع مفتاح الدولة.</p>
- <input id="phone" type="tel" placeholder="+218921000959" autocomplete="tel">
- <div id="recaptcha-container"></div>
- <button class="btn" onclick="sendCode()">إرسال رمز التحقق</button>
- <div id="verifyBox" class="hidden">
-  <input id="otp" type="text" placeholder="رمز التحقق" inputmode="numeric">
-  <button class="btn" onclick="verifyCode()">تأكيد الرمز والدخول</button>
+
+ <div class="auth-switch">
+  <button id="loginTab" class="active" onclick="setAuthMode('login')">دخول</button>
+  <button id="registerTab" onclick="setAuthMode('register')">حساب جديد</button>
  </div>
+
+ <label>البريد الإلكتروني</label>
+ <input id="email" type="email" placeholder="example@gmail.com" autocomplete="email" dir="ltr">
+
+ <label>كلمة المرور</label>
+ <input id="password" type="password" placeholder="أدخل كلمة المرور" autocomplete="current-password">
+
+ <div id="confirmPasswordBox" class="hidden">
+  <label>تأكيد كلمة المرور</label>
+  <input id="confirmPassword" type="password" placeholder="أعد كتابة كلمة المرور" autocomplete="new-password">
+ </div>
+
+ <button class="btn" id="authButton" onclick="submitAuth()">تسجيل الدخول</button>
+
+ <button id="forgotButton" class="menuitem" onclick="resetPassword()">نسيت كلمة المرور؟</button>
+
+ <p class="auth-help">استخدم بريدك الإلكتروني وكلمة المرور للدخول إلى فيراري. لا حاجة إلى رسائل SMS.</p>
  <p class="msg" id="message"></p>
 </section>
 
@@ -208,7 +223,8 @@ const firebaseConfig={
  appId:"1:200480445099:web:2be93d9778ba54c84b1dee"
 };
 
-let auth=null,db=null,user=null,profile=null,confirmation=null,verifier=null;
+let auth=null,db=null,user=null,profile=null;
+let authMode='login';
 let map=null,start=null,end=null,route=null,userMarker=null;
 let startMarker=null,endMarker=null;
 let ridesListener=null,driverListener=null;
@@ -220,12 +236,18 @@ db=firebase.firestore();
 
 auth.onAuthStateChanged(async u=>{
  user=u;
- if(u)await loadProfile();
- else profile=null;
+ if(u){
+  await loadProfile();
+  el('accountInfo').textContent='الحساب: '+(u.email||'');
+ }else{
+  profile=null;
+  el('accountInfo').textContent='مرحباً بك';
+ }
 });
 
 function el(id){return document.getElementById(id)}
 function message(id,text){el(id).textContent=text}
+
 function escapeHtml(value){
  return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -261,7 +283,7 @@ function initMap(){
  setTimeout(()=>map.invalidateSize(),300);
 }
 
-/* البحث المستقل عن المواقع */
+/* البحث عن المواقع */
 async function searchLocation(type){
  const isPickup=type==='pickup';
  const input=el(isPickup?'pickupSearch':'destinationSearch');
@@ -286,7 +308,6 @@ async function searchLocation(type){
 
   const data=await response.json();
   searchResults[type]=data;
-
   resultsBox.innerHTML='';
 
   if(!data.length){
@@ -308,7 +329,6 @@ async function searchLocation(type){
  }
 }
 
-/* اختيار نتيجة البحث ووضع العلامة على الخريطة */
 function chooseSearchResult(type,index){
  const place=searchResults[type][index];
  if(!place||!map)return;
@@ -322,42 +342,28 @@ function chooseSearchResult(type,index){
 
  if(type==='pickup'){
   start=point;
-
   if(startMarker)map.removeLayer(startMarker);
-
-  startMarker=L.marker(point).addTo(map)
-   .bindPopup('نقطة الانطلاق: '+escapeHtml(place.display_name));
-
+  startMarker=L.marker(point).addTo(map).bindPopup('نقطة الانطلاق: '+escapeHtml(place.display_name));
   startMarker.openPopup();
   message('status','تم تحديد نقطة الانطلاق. اختر الوجهة الآن.');
  }else{
   end=point;
-
   if(endMarker)map.removeLayer(endMarker);
-
-  endMarker=L.marker(point).addTo(map)
-   .bindPopup('الوجهة: '+escapeHtml(place.display_name));
-
+  endMarker=L.marker(point).addTo(map).bindPopup('الوجهة: '+escapeHtml(place.display_name));
   endMarker.openPopup();
   message('status','تم تحديد الوجهة. يمكنك طلب الرحلة الآن.');
  }
 
  el(type==='pickup'?'pickupResults':'destinationResults').innerHTML='';
 
- if(start&&end){
-  map.fitBounds(L.latLngBounds(start,end),{padding:[45,45]});
- }else{
-  map.setView(point,16);
- }
+ if(start&&end)map.fitBounds(L.latLngBounds(start,end),{padding:[45,45]});
+ else map.setView(point,16);
 }
 
-/* تحديد النقاط بالضغط على الخريطة */
 function selectPoint(e){
- if(!start){
-  setMapPoint('pickup',e.latlng);
- }else if(!end){
-  setMapPoint('destination',e.latlng);
- }else{
+ if(!start)setMapPoint('pickup',e.latlng);
+ else if(!end)setMapPoint('destination',e.latlng);
+ else{
   resetMap();
   setMapPoint('pickup',e.latlng);
  }
@@ -379,7 +385,6 @@ function setMapPoint(type,point){
  if(start&&end)map.fitBounds(L.latLngBounds(start,end),{padding:[35,35]});
 }
 
-/* مسح النقطتين وإعادة الاختيار */
 function resetMap(){
  if(!map)return;
 
@@ -390,7 +395,6 @@ function resetMap(){
 
  start=null;
  end=null;
-
  el('pickupResults').innerHTML='';
  el('destinationResults').innerHTML='';
  el('pickupSearch').value='';
@@ -399,20 +403,125 @@ function resetMap(){
  message('status','تم مسح النقطتين. حدد الانطلاق والوجهة من جديد.');
 }
 
-function showLogin(){
+/* تسجيل الدخول وإنشاء الحساب */
+function showLogin(mode='login'){
  openApp();
  closePanels();
- el('login').style.display='block';
  toggleMenu(false);
-}
-function closeLogin(){el('login').style.display='none'}
-function closePanels(){['login','myRides','driverPanel','driverApplication'].forEach(id=>el(id).style.display='none')}
-function toggleMenu(force){
- const m=el('menu');
- if(force===false)m.classList.remove('open');
- else m.classList.toggle('open');
+ el('login').style.display='block';
+ setAuthMode(mode);
 }
 
+function closeLogin(){
+ el('login').style.display='none';
+}
+
+function closePanels(){
+ ['login','myRides','driverPanel','driverApplication'].forEach(id=>{
+  el(id).style.display='none';
+ });
+}
+
+function setAuthMode(mode){
+ authMode=mode;
+ const isRegister=mode==='register';
+
+ el('authTitle').textContent=isRegister?'إنشاء حساب جديد':'تسجيل الدخول';
+ el('authButton').textContent=isRegister?'إنشاء الحساب':'تسجيل الدخول';
+ el('loginTab').classList.toggle('active',!isRegister);
+ el('registerTab').classList.toggle('active',isRegister);
+ el('confirmPasswordBox').classList.toggle('hidden',!isRegister);
+ el('forgotButton').classList.toggle('hidden',isRegister);
+ el('password').autocomplete=isRegister?'new-password':'current-password';
+ message('message','');
+}
+
+async function submitAuth(){
+ const email=el('email').value.trim().toLowerCase();
+ const password=el('password').value;
+ const msg=el('message');
+
+ msg.textContent='';
+
+ if(!email||!password){
+  msg.textContent='أدخل البريد الإلكتروني وكلمة المرور.';
+  return;
+ }
+
+ if(password.length<6){
+  msg.textContent='كلمة المرور يجب أن تكون 6 أحرف أو أكثر.';
+  return;
+ }
+
+ try{
+  el('authButton').disabled=true;
+  msg.textContent='جارٍ تنفيذ العملية...';
+
+  if(authMode==='register'){
+   const confirm=el('confirmPassword').value;
+
+   if(password!==confirm){
+    msg.textContent='كلمتا المرور غير متطابقتين.';
+    return;
+   }
+
+   const result=await auth.createUserWithEmailAndPassword(email,password);
+   user=result.user;
+   await loadProfile();
+
+   msg.textContent='تم إنشاء الحساب بنجاح.';
+  }else{
+   const result=await auth.signInWithEmailAndPassword(email,password);
+   user=result.user;
+   await loadProfile();
+
+   msg.textContent='تم تسجيل الدخول بنجاح.';
+  }
+
+  closeLogin();
+  el('app').style.display='block';
+  el('intro').style.display='none';
+  initMap();
+  showHomeForRole();
+
+ }catch(e){
+  const errors={
+   'auth/email-already-in-use':'هذا البريد مسجل بالفعل. حاول تسجيل الدخول.',
+   'auth/invalid-email':'البريد الإلكتروني غير صحيح.',
+   'auth/weak-password':'كلمة المرور ضعيفة. استخدم 6 أحرف على الأقل.',
+   'auth/user-not-found':'لا يوجد حساب بهذا البريد. أنشئ حساباً جديداً.',
+   'auth/wrong-password':'كلمة المرور غير صحيحة.',
+   'auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة.',
+   'auth/too-many-requests':'محاولات كثيرة. حاول لاحقاً.',
+   'auth/network-request-failed':'تحقق من اتصال الإنترنت.'
+  };
+
+  msg.textContent=errors[e.code]||('حدث خطأ: '+(e.code||'')+' '+e.message);
+
+ }finally{
+  el('authButton').disabled=false;
+ }
+}
+
+/* استعادة كلمة المرور */
+async function resetPassword(){
+ const email=el('email').value.trim().toLowerCase();
+
+ if(!email){
+  message('message','اكتب بريدك الإلكتروني أولاً.');
+  el('email').focus();
+  return;
+ }
+
+ try{
+  await auth.sendPasswordResetEmail(email);
+  message('message','تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني. افحص صندوق الوارد والرسائل غير المرغوب فيها.');
+ }catch(e){
+  message('message','تعذر إرسال الرابط: '+(e.code||'')+' '+e.message);
+ }
+}
+
+/* تحديد الموقع الحالي */
 function locateMe(){
  if(!navigator.geolocation){
   alert('المتصفح لا يدعم تحديد الموقع');
@@ -432,7 +541,6 @@ function locateMe(){
   }).addTo(map).bindPopup('موقعك الحالي');
 
   map.setView(ll,16);
-
   start=ll;
 
   if(startMarker)map.removeLayer(startMarker);
@@ -452,70 +560,35 @@ function savePlace(type){
  alert('تم حفظ الموقع على هذا الجهاز');
 }
 
-async function sendCode(){
- const phone=el('phone').value.trim(),msg=el('message');
- msg.textContent='';
- el('verifyBox').classList.add('hidden');
- confirmation=null;
-
- const isTest=phone==='+16505553434';
- const isLibyan=/^\+2189\d{8}$/.test(phone);
-
- if(!isTest&&!isLibyan){
-  msg.textContent='أدخل رقم ليبيا بصيغة +2189XXXXXXXX أو رقم الاختبار المسجل.';
-  return;
- }
-
- try{
-  if(verifier){try{verifier.clear()}catch(e){}verifier=null}
-  auth.settings.appVerificationDisabledForTesting=isTest;
-  verifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'normal'});
-  await verifier.render();
-  confirmation=await auth.signInWithPhoneNumber(phone,verifier);
-  el('verifyBox').classList.remove('hidden');
-  msg.textContent=isTest?'أدخل رمز الاختبار المسجل في Firebase.':'تم إرسال طلب التحقق. أدخل رمز SMS الذي وصلك.';
- }catch(e){
-  confirmation=null;
-  msg.textContent='تعذر إرسال الرمز: '+(e.code||'')+' — '+(e.message||String(e));
-  if(verifier){try{verifier.clear()}catch(ignore){}verifier=null}
- }
-}
-
-async function verifyCode(){
- const code=el('otp').value.trim(),msg=el('message');
-
- if(!confirmation){msg.textContent='اضغط إرسال رمز التحقق أولاً.';return}
- if(!code){msg.textContent='أدخل رمز التحقق.';return}
-
- try{
-  const result=await confirmation.confirm(code);
-  user=result.user;
-  await loadProfile();
-  closeLogin();
-  openApp();
-  showHomeForRole();
- }catch(e){
-  msg.textContent='فشل تأكيد الرمز: '+(e.code||'')+' — '+e.message;
- }
-}
-
+/* بيانات المستخدم */
 async function loadProfile(){
  if(!user||!db)return;
 
  try{
-  const ref=db.collection('users').doc(user.uid),snap=await ref.get();
+  const ref=db.collection('users').doc(user.uid);
+  const snap=await ref.get();
 
   if(!snap.exists){
    await ref.set({
-    phone:user.phoneNumber||'',
+    email:user.email||'',
     role:'customer',
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
    });
    profile=(await ref.get()).data();
-  }else profile=snap.data();
+  }else{
+   profile=snap.data();
+   if(!profile.email){
+    await ref.set({email:user.email||''},{merge:true});
+    profile.email=user.email||'';
+   }
+  }
 
-  el('accountInfo').textContent='الحساب: '+(user.phoneNumber||'');
- }catch(e){console.error(e)}
+  el('accountInfo').textContent='الحساب: '+(user.email||'');
+
+ }catch(e){
+  console.error('Profile error:',e);
+  message('message','تعذر تحميل بيانات الحساب: '+e.message);
+ }
 }
 
 function showHomeForRole(){
@@ -525,8 +598,9 @@ function showHomeForRole(){
  }
 }
 
+/* طلب رحلة */
 async function requestRide(){
- if(!user){showLogin();return}
+ if(!user){showLogin('login');return}
  if(!start||!end){alert('حدد نقطة الانطلاق والوجهة أولاً');return}
 
  try{
@@ -550,6 +624,7 @@ async function requestRide(){
 
   await db.collection('rides').add({
    customerId:user.uid,
+   customerEmail:user.email||'',
    service:'car',
    pickup:start.lat+','+start.lng,
    destination:end.lat+','+end.lng,
@@ -568,46 +643,53 @@ async function requestRide(){
  }
 }
 
+/* رحلات المستخدم */
 function showMyRides(){
  toggleMenu(false);
  closePanels();
 
- if(!user){showLogin();return}
+ if(!user){showLogin('login');return}
 
  el('myRides').style.display='block';
-
  const list=el('myRidesList');
  list.innerHTML='<p>جارٍ تحميل الرحلات...</p>';
 
  if(ridesListener)ridesListener();
 
- ridesListener=db.collection('rides').where('customerId','==',user.uid).onSnapshot(snapshot=>{
-  list.innerHTML='';
+ ridesListener=db.collection('rides')
+  .where('customerId','==',user.uid)
+  .onSnapshot(snapshot=>{
+   list.innerHTML='';
 
-  if(snapshot.empty){list.innerHTML='<p>لا توجد رحلات حتى الآن.</p>';return}
+   if(snapshot.empty){
+    list.innerHTML='<p>لا توجد رحلات حتى الآن.</p>';
+    return;
+   }
 
-  snapshot.forEach(doc=>{
-   const r=doc.data(),card=document.createElement('div');
-   card.className='card';
+   snapshot.forEach(doc=>{
+    const r=doc.data(),card=document.createElement('div');
+    card.className='card';
 
-   card.innerHTML='<p><b>الحالة:</b> '+escapeHtml(r.status==='accepted'?'تم قبول الرحلة':'بانتظار سائق')+'</p>'+
-    '<p><b>المسافة:</b> '+Number(r.distance||0).toFixed(2)+' كم</p>'+
-    '<p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>'+
-    (r.driverName?'<p><b>السائق:</b> '+escapeHtml(r.driverName)+'</p>':'')+
-    (r.vehicleType?'<p><b>السيارة:</b> '+escapeHtml(r.vehicleType)+'</p>':'')+
-    (r.driverPhone?'<p><b>هاتف السائق:</b> '+escapeHtml(r.driverPhone)+'</p>':'');
+    card.innerHTML=
+     '<p><b>الحالة:</b> '+escapeHtml(r.status==='accepted'?'تم قبول الرحلة':'بانتظار سائق')+'</p>'+
+     '<p><b>المسافة:</b> '+Number(r.distance||0).toFixed(2)+' كم</p>'+
+     '<p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>'+
+     (r.driverName?'<p><b>السائق:</b> '+escapeHtml(r.driverName)+'</p>':'')+
+     (r.vehicleType?'<p><b>السيارة:</b> '+escapeHtml(r.vehicleType)+'</p>':'')+
+     (r.driverPhone?'<p><b>وسيلة التواصل:</b> '+escapeHtml(r.driverPhone)+'</p>':'');
 
-   list.appendChild(card);
-  });
+    list.appendChild(card);
+   });
 
- },e=>list.textContent='تعذر تحميل الرحلات: '+e.message);
+  },e=>list.textContent='تعذر تحميل الرحلات: '+e.message);
 }
 
+/* لوحة السائق */
 function showDriverPanel(){
  toggleMenu(false);
  closePanels();
 
- if(!user){showLogin();return}
+ if(!user){showLogin('login');return}
 
  if(!profile||profile.role!=='driver'||profile.approved!==true){
   alert('هذا الحساب ليس حساب سائق معتمداً بعد.');
@@ -625,7 +707,10 @@ function saveDriverInfo(){
  const name=el('driverName').value.trim();
  const vehicle=el('vehicleType').value.trim();
 
- if(!name||!vehicle){alert('اكتب اسم السائق ونوع السيارة');return}
+ if(!name||!vehicle){
+  alert('اكتب اسم السائق ونوع السيارة');
+  return;
+ }
 
  localStorage.setItem('ferrariDriverName',name);
  localStorage.setItem('ferrariVehicleType',vehicle);
@@ -638,26 +723,32 @@ function loadPendingRides(){
 
  if(driverListener)driverListener();
 
- driverListener=db.collection('rides').where('status','==','pending').onSnapshot(snapshot=>{
-  box.innerHTML='';
+ driverListener=db.collection('rides')
+  .where('status','==','pending')
+  .onSnapshot(snapshot=>{
+   box.innerHTML='';
 
-  if(snapshot.empty){box.innerHTML='<p>لا توجد رحلات متاحة حالياً.</p>';return}
+   if(snapshot.empty){
+    box.innerHTML='<p>لا توجد رحلات متاحة حالياً.</p>';
+    return;
+   }
 
-  snapshot.forEach(doc=>{
-   const r=doc.data(),card=document.createElement('div');
-   card.className='card';
+   snapshot.forEach(doc=>{
+    const r=doc.data(),card=document.createElement('div');
+    card.className='card';
 
-   card.innerHTML='<p><b>من:</b> '+escapeHtml(r.pickup)+'</p>'+
-    '<p><b>إلى:</b> '+escapeHtml(r.destination)+'</p>'+
-    '<p><b>المسافة:</b> '+Number(r.distance||0).toFixed(2)+' كم</p>'+
-    '<p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>'+
-    '<button class="small-btn">قبول الرحلة</button>';
+    card.innerHTML=
+     '<p><b>من:</b> '+escapeHtml(r.pickup)+'</p>'+
+     '<p><b>إلى:</b> '+escapeHtml(r.destination)+'</p>'+
+     '<p><b>المسافة:</b> '+Number(r.distance||0).toFixed(2)+' كم</p>'+
+     '<p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>'+
+     '<button class="small-btn">قبول الرحلة</button>';
 
-   card.querySelector('button').addEventListener('click',()=>acceptRide(doc.id));
-   box.appendChild(card);
-  });
+    card.querySelector('button').addEventListener('click',()=>acceptRide(doc.id));
+    box.appendChild(card);
+   });
 
- },e=>box.textContent='تعذر تحميل الرحلات: '+e.message);
+  },e=>box.textContent='تعذر تحميل الرحلات: '+e.message);
 }
 
 async function acceptRide(rideId){
@@ -669,15 +760,13 @@ async function acceptRide(rideId){
  const name=el('driverName').value.trim()||localStorage.getItem('ferrariDriverName')||'سائق فيراري';
  const vehicle=el('vehicleType').value.trim()||localStorage.getItem('ferrariVehicleType')||'سيارة';
 
- if(!user.phoneNumber){alert('رقم هاتف السائق غير متاح');return}
-
  try{
   await db.collection('rides').doc(rideId).update({
    status:'accepted',
    driverId:user.uid,
    driverName:name,
    vehicleType:vehicle,
-   driverPhone:user.phoneNumber
+   driverPhone:user.email||''
   });
 
   alert('تم قبول الرحلة بنجاح.');
@@ -687,24 +776,26 @@ async function acceptRide(rideId){
  }
 }
 
+/* التسجيل كسائق */
 function showDriverApplication(){
  toggleMenu(false);
  closePanels();
 
- if(!user){showLogin();return}
+ if(!user){showLogin('login');return}
 
+ el('appEmail').value=user.email||'';
  el('driverApplication').style.display='block';
 }
 
 async function submitDriverApplication(){
- if(!user){showLogin();return}
+ if(!user){showLogin('login');return}
 
  const name=el('appName').value.trim();
- const email=el('appEmail').value.trim();
+ const email=user.email||'';
  const vehicleType=el('appVehicle').value.trim();
  const msg=el('applicationMessage');
 
- if(!name||!email||!vehicleType){
+ if(!name||!vehicleType){
   msg.textContent='أكمل جميع البيانات أولاً.';
   return;
  }
@@ -719,7 +810,10 @@ async function submitDriverApplication(){
   }
 
   await ref.set({
-   name,email,vehicleType,status:'pending',
+   name,
+   email,
+   vehicleType,
+   status:'pending',
    createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 
@@ -728,6 +822,12 @@ async function submitDriverApplication(){
  }catch(e){
   msg.textContent='تعذر إرسال الطلب: '+(e.code||'')+' — '+e.message;
  }
+}
+
+function toggleMenu(force){
+ const m=el('menu');
+ if(force===false)m.classList.remove('open');
+ else m.classList.toggle('open');
 }
 
 async function logout(){
