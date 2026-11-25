@@ -1231,3 +1231,18 @@ if("serviceWorker" in navigator){
 </script>
 </body>
 </html>
+/* إغلاق القائمة عند الضغط خارجها */
+document.addEventListener('click',function(event){
+ const menu=el('menu');
+
+ if(!menu.classList.contains('open'))return;
+
+ // الضغط داخل القائمة لا يغلقها
+ if(menu.contains(event.target))return;
+
+ // زر القائمة يفتحها ويغلقها بنفسه
+ if(event.target.closest('.top .circle'))return;
+
+ // أي ضغط خارج القائمة يغلقها
+ toggleMenu(false);
+});
