@@ -31,7 +31,7 @@ html,body{margin:0;width:100%;height:100%;font-family:Arial,sans-serif;color:#29
 #menu{position:absolute;z-index:800;top:0;bottom:0;right:0;width:290px;max-width:85vw;background:white;padding:25px;box-shadow:-5px 0 25px #0002;transform:translateX(110%);transition:.2s}#menu.open{transform:translateX(0)}
 #menu h2{color:var(--pink)}.menuitem{display:block;width:100%;padding:16px;margin:9px 0;text-align:right;border-radius:12px;background:#fff1f7;color:#333}
 #login{display:none;position:absolute;z-index:900;inset:0;background:white;padding:25px;overflow:auto}#login h2{color:var(--pink)}
-input{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;margin:9px 0;font-size:16px}.btn{width:100%;padding:16px;background:var(--pink);color:white;border-radius:13px;font-size:17px;font-weight:bold;margin-top:12px}.msg{color:var(--pink);font-size:14px}
+input{width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;margin:9px 0;font-size:16px}.btn{width:100%;padding:16px;background:var(--pink);color:white;border-radius:13px;font-size:17px;font-weight:bold;margin-top:12px}.msg{color:var(--pink);font-size:14px;overflow-wrap:anywhere;line-height:1.6}
 @media(min-width:750px){#intro{background:#fff0f6}#intro-art{object-fit:contain}.sheet{left:auto;width:430px;bottom:20px;right:20px;border-radius:22px}#map{inset:0}.locate-btn{top:90px}}
 </style>
 </head>
@@ -72,7 +72,6 @@ let auth=null,db=null,user=null,confirmation=null,verifier=null;
 try{firebase.initializeApp(firebaseConfig);auth=firebase.auth();db=firebase.firestore();auth.onAuthStateChanged(u=>user=u)}catch(e){console.log(e)}
 let map=null,start=null,end=null,markers=[],route=null,userMarker=null,nearbyCars=[],carTimer=null;
 function openApp(){document.getElementById('intro').style.display='none';document.getElementById('app').style.display='block';if(!map){map=L.map('map').setView([32.8872,13.1913],13);L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:20}).addTo(map);L.control.zoom({position:'bottomright'}).addTo(map);map.on('click',selectPoint);addNearbyCars();}setTimeout(()=>map.invalidateSize(),300)}
-
 function locateMe(){
  if(!navigator.geolocation){alert('تحديد الموقع غير مدعوم في هذا المتصفح');return}
  document.getElementById('status').innerText='جارٍ تحديد موقعك…';
@@ -92,13 +91,61 @@ function addNearbyCars(){
  if(carTimer)clearInterval(carTimer);let step=0;
  carTimer=setInterval(()=>{if(!map||!document.getElementById('app')||document.getElementById('app').style.display==='none')return;step+=1;nearbyCars.forEach(c=>{const a=step*.00045*(c.i%2?1:-1);c.marker.setLatLng([c.base[0]+Math.sin(step/7+c.i)*.0015+a,c.base[1]+Math.cos(step/8+c.i)*.0018]);});},900);
 }
-
 function showLogin(){openApp();document.getElementById('login').style.display='block'}function closeLogin(){document.getElementById('login').style.display='none'}function toggleMenu(){document.getElementById('menu').classList.toggle('open')}
 function selectPoint(e){if(!start||end){resetMap();start=e.latlng;markers.push(L.marker(start).addTo(map).bindPopup('الانطلاق').openPopup());document.getElementById('status').innerText='تم تحديد الانطلاق، اختر الوجهة'}else{end=e.latlng;markers.push(L.marker(end).addTo(map).bindPopup('الوجهة'));map.fitBounds(L.latLngBounds(start,end),{padding:[30,30]});document.getElementById('status').innerText='تم تحديد الوجهة، اطلب رحلتك الآن'}}
 function resetMap(){if(!map)return;markers.forEach(m=>map.removeLayer(m));markers=[];start=null;end=null;if(route){map.removeLayer(route);route=null}if(userMarker){map.removeLayer(userMarker);userMarker=null}document.getElementById('status').innerText='حدد موقع الانطلاق والوجهة بالضغط على الخريطة'}
 function savePlace(type){if(!start){alert('حدد موقع الانطلاق أولاً');return}localStorage.setItem(type,JSON.stringify([start.lat,start.lng]));alert('تم حفظ الموقع على هذا الجهاز')}
-async function requestRide(){if(!user){showLogin();return}if(!start||!end){alert('حدد الانطلاق والوجهة على الخريطة');return}if(!db){alert('قاعدة البيانات غير متاحة حالياً');return}try{const url=`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;const response=await fetch(url);const data=await response.json();if(!data.routes?.length)throw Error();const km=data.routes[0].distance/1000;const price=5+km*1.5;if(route)map.removeLayer(route);route=L.geoJSON(data.routes[0].geometry,{style:{color:'#ed1675',weight:5}}).addTo(map);await db.collection('rides').add({customerId:user.uid,service:'car',pickup:`${start.lat},${start.lng}`,destination:`${end.lat},${end.lng}`,distance:km,price:price,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});alert('تم إرسال طلب الرحلة. السعر التقريبي: '+price.toFixed(2)+' د.ل')}catch(e){alert('تعذر إرسال الطلب. تحقق من الاتصال وإعدادات Firebase')}}
-async function sendCode(){const phone=document.getElementById('phone').value.trim(),msg=document.getElementById('message');if(!auth){msg.innerText='خدمة الدخول غير متاحة حالياً';return}if(!/^\+2189\d{8}$/.test(phone)){msg.innerText='اكتب الرقم بصيغة +2189XXXXXXXX';return}try{if(!verifier){verifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'normal'});await verifier.render()}confirmation=await auth.signInWithPhoneNumber(phone,verifier);document.getElementById('verifyBox').hidden=false;msg.innerText='تم إرسال رمز التحقق'}catch(e){msg.innerText='تعذر الإرسال: '+e.message;if(verifier){verifier.clear();verifier=null}}}
-async function verifyCode(){try{if(!confirmation)throw Error();const result=await confirmation.confirm(document.getElementById('otp').value.trim());user=result.user;if(db)await db.collection('users').doc(user.uid).set({phone:user.phoneNumber,role:'customer',createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});document.getElementById('message').innerText='تم تسجيل الدخول بنجاح';setTimeout(closeLogin,1000)}catch(e){document.getElementById('message').innerText='رمز غير صحيح أو حدث خطأ'}}
+async function requestRide(){if(!user){showLogin();return}if(!start||!end){alert('حدد الانطلاق والوجهة على الخريطة');return}if(!db){alert('قاعدة البيانات غير متاحة حالياً');return}try{const url=`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;const response=await fetch(url);const data=await response.json();if(!data.routes?.length)throw Error('لم يتم العثور على مسار');const km=data.routes[0].distance/1000;const price=5+km*1.5;if(route)map.removeLayer(route);route=L.geoJSON(data.routes[0].geometry,{style:{color:'#ed1675',weight:5}}).addTo(map);await db.collection('rides').add({customerId:user.uid,service:'car',pickup:`${start.lat},${start.lng}`,destination:`${end.lat},${end.lng}`,distance:km,price:price,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});alert('تم إرسال طلب الرحلة. السعر التقريبي: '+price.toFixed(2)+' د.ل')}catch(e){alert('تعذر إرسال الطلب: '+(e.message||e))}}
+async function sendCode(){
+ const phone=document.getElementById('phone').value.trim();
+ const msg=document.getElementById('message');
+ const verifyBox=document.getElementById('verifyBox');
+ msg.innerText='';
+ verifyBox.hidden=true;
+ confirmation=null;
+ if(!auth){msg.innerText='خدمة الدخول غير متاحة. تحقق من اتصال Firebase.';return}
+ if(!/^\+2189\d{8}$/.test(phone)){msg.innerText='اكتب الرقم بصيغة +2189XXXXXXXX';return}
+ try{
+  if(!verifier){
+   verifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{size:'normal'});
+  }
+  await verifier.render();
+  confirmation=await auth.signInWithPhoneNumber(phone,verifier);
+  verifyBox.hidden=false;
+  msg.innerText='تم تجهيز التحقق. أدخل رمز الاختبار المسجل في Firebase.';
+ }catch(e){
+  confirmation=null;
+  msg.innerText='تعذر الإرسال: '+(e.code||'')+' — '+(e.message||String(e));
+  if(verifier){try{verifier.clear()}catch(ignore){}verifier=null}
+ }
+}
+async function verifyCode(){
+ const msg=document.getElementById('message');
+ const code=document.getElementById('otp').value.trim();
+ if(!confirmation){msg.innerText='لم تبدأ عملية التحقق. اضغط إرسال رمز التحقق أولاً.';return}
+ if(!code){msg.innerText='أدخل رمز التحقق.';return}
+ let result;
+ try{
+  result=await confirmation.confirm(code);
+  user=result.user;
+ }catch(e){
+  msg.innerText='فشل تأكيد الرمز: '+(e.code||'')+' — '+(e.message||String(e));
+  return;
+ }
+ msg.innerText='تم تسجيل الدخول بنجاح.';
+ if(db){
+  try{
+   await db.collection('users').doc(user.uid).set({
+    phone:user.phoneNumber,
+    role:'customer',
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+   },{merge:true});
+  }catch(e){
+   msg.innerText='تم تسجيل الدخول، لكن تعذر حفظ بيانات الحساب: '+(e.code||'')+' — '+(e.message||String(e));
+  }
+ }
+ setTimeout(closeLogin,1800);
+}
 </script>
-</body></html>
+</body>
+</html>
