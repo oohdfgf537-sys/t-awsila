@@ -1,0 +1,22 @@
+
+{
+  "name": "FERRARI | فيراري",
+  "short_name": "فيراري",
+  "description": "تطبيق فيراري لطلب الرحلات",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff0f6",
+  "theme_color": "#ed1675",
+  "icons": [
+    {
+      "src": "./ferrari-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
