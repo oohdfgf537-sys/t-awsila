@@ -55,7 +55,14 @@ input,select{font-family:inherit}
 .car-options{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
 .car-option{background:#fafafa;border:1.5px solid #eee;border-radius:14px;padding:9px 5px 10px;text-align:center;color:#444;min-width:0;overflow:hidden;transition:.18s}
 .car-option.selected{border-color:var(--pink);background:#fff1f7;box-shadow:0 2px 10px #ed16751c}
-.car-option .car-photo{width:100%;height:76px;display:block;object-fit:contain;margin:0 auto 7px;border-radius:9px}
+.car-option .car-icon{width:100%;height:76px;display:block;margin:0 auto 7px;color:#29252a}
+.car-option.selected .car-icon{color:var(--pink)}
+.car-icon svg{width:100%;height:100%;display:block;overflow:visible}
+.car-icon .body{fill:currentColor;opacity:.09}
+.car-icon .line{fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.car-icon .detail{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.car-icon .wheel{fill:#fff;stroke:currentColor;stroke-width:2.5}
+.car-icon .hub{fill:currentColor}
 .car-option strong{font-size:12px;display:block}.car-option small{font-size:10px;color:#888;display:block;margin-top:4px}
 .estimate{display:none;background:#fff6fa;border:1px solid #f6dce8;border-radius:13px;padding:12px;margin-top:12px}
 .estimate-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;margin:5px 0}
@@ -143,9 +150,33 @@ input,select{font-family:inherit}
   <div id="destinationResults" class="search-results"></div>
   <div class="section-title">اختر نوع الرحلة</div>
   <div class="car-options">
-   <button class="car-option selected" id="carStandard" onclick="selectCar('standard')"><img class="car-photo" src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=480&q=80" alt="سيارة اقتصادية" loading="lazy"><strong>اقتصادية</strong><small>السعر الأساسي</small></button>
-   <button class="car-option" id="carComfort" onclick="selectCar('comfort')"><img class="car-photo" src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=480&q=80" alt="سيارة مريحة" loading="lazy"><strong>مريحة</strong><small>زيادة 25%</small></button>
-   <button class="car-option" id="carFamily" onclick="selectCar('family')"><img class="car-photo" src="https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?auto=format&fit=crop&w=480&q=80" alt="سيارة عائلية" loading="lazy"><strong>عائلية</strong><small>زيادة 50%</small></button>
+   <button class="car-option selected" id="carStandard" onclick="selectCar('standard')">
+    <span class="car-icon" aria-hidden="true"><svg viewBox="0 0 180 90" xmlns="http://www.w3.org/2000/svg">
+     <path class="body" d="M12 59 22 47 48 42 65 24Q70 17 82 17h34q12 0 20 13l13 15 17 7 4 12-5 7H15l-4-7z"/>
+     <path class="line" d="M12 59 22 47 48 42 65 24Q70 17 82 17h34q12 0 20 13l13 15 17 7 4 12-5 7H15l-4-7z"/>
+     <path class="detail" d="m54 41 17-20h43q12 1 23 20zM92 21v20M48 46h91M17 57h14m119-10 11 4"/>
+     <circle class="wheel" cx="46" cy="68" r="11"/><circle class="hub" cx="46" cy="68" r="3.5"/><circle class="wheel" cx="142" cy="68" r="11"/><circle class="hub" cx="142" cy="68" r="3.5"/>
+    </svg></span>
+    <strong>اقتصادية</strong><small>السعر الأساسي</small>
+   </button>
+   <button class="car-option" id="carComfort" onclick="selectCar('comfort')">
+    <span class="car-icon" aria-hidden="true"><svg viewBox="0 0 180 90" xmlns="http://www.w3.org/2000/svg">
+     <path class="body" d="m10 59 9-12 27-5 17-19q7-8 20-8h38q14 0 23 14l12 15 16 7 3 13-5 7H14z"/>
+     <path class="line" d="m10 59 9-12 27-5 17-19q7-8 20-8h38q14 0 23 14l12 15 16 7 3 13-5 7H14z"/>
+     <path class="detail" d="m51 41 18-21h43q13 1 25 21zM91 20v21m28-20 17 20M20 50l25-5m104-1 13 5M68 47h48"/>
+     <circle class="wheel" cx="44" cy="68" r="11"/><circle class="hub" cx="44" cy="68" r="3.5"/><circle class="wheel" cx="145" cy="68" r="11"/><circle class="hub" cx="145" cy="68" r="3.5"/>
+    </svg></span>
+    <strong>مريحة</strong><small>زيادة 25%</small>
+   </button>
+   <button class="car-option" id="carFamily" onclick="selectCar('family')">
+    <span class="car-icon" aria-hidden="true"><svg viewBox="0 0 180 90" xmlns="http://www.w3.org/2000/svg">
+     <path class="body" d="m12 57 8-15 22-5 12-20q4-7 14-7h54q12 0 18 12l9 16 17 7 5 15-5 10H15z"/>
+     <path class="line" d="m12 57 8-15 22-5 12-20q4-7 14-7h54q12 0 18 12l9 16 17 7 5 15-5 10H15z"/>
+     <path class="detail" d="m50 36 11-20q2-4 9-4h19v24zm43-24h27q8 0 13 10l8 14H93zM90 12v24M44 42h105M18 55h13m122-9 12 4"/>
+     <circle class="wheel" cx="45" cy="67" r="11"/><circle class="hub" cx="45" cy="67" r="3.5"/><circle class="wheel" cx="145" cy="67" r="11"/><circle class="hub" cx="145" cy="67" r="3.5"/>
+    </svg></span>
+    <strong>عائلية</strong><small>زيادة 50%</small>
+   </button>
   </div>
   <div class="estimate" id="estimate">
    <div class="estimate-row"><span>المسافة المتوقعة</span><strong id="distanceText">-- كم</strong></div>
