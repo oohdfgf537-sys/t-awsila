@@ -50,7 +50,12 @@ input,select{font-family:inherit}
 
 .map-hint{position:absolute;z-index:450;top:76px;right:50%;transform:translateX(50%);background:#fff;border-radius:25px;padding:9px 14px;box-shadow:0 3px 15px #0002;font-size:12px;white-space:nowrap;color:#555}
 .sheet{position:absolute;bottom:0;right:0;left:0;z-index:600;background:white;border-radius:25px 25px 0 0;padding:10px 17px calc(15px + env(safe-area-inset-bottom));box-shadow:0 -5px 25px #0002;max-height:78%;overflow-y:auto}
-/* بعد قبول الرحلة نعرض الخريطة كاملة ونخفي لوحة البحث والسيارات */
+/* وضع مستقل للسائق: إخفاء واجهة حجز الراكب وخانات البحث والسيارات */
+#app.driver-mode #customerSheet{display:none!important}
+#app.driver-mode #driverSearchOverlay{display:none!important}
+#app.driver-mode #mapHint{display:none!important}
+#app.driver-mode #liveRouteInfo{top:78px}
+/* بعد قبول الرحلة نعرض الخريطة كاملة */
 #app.ride-accepted #customerSheet{display:none!important}
 #app.ride-accepted #mapHint{display:block}
 
@@ -723,7 +728,8 @@ function updateDriverPassengerLocation(loc){
  if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat < -90||lat > 90||lng < -180||lng > 180)return;
  const point=L.latLng(lat,lng);
  const icon=L.divIcon({className:'',html:'<div style="font-size:30px;text-shadow:0 2px 5px #0005">📍</div>',iconSize:[38,38],iconAnchor:[19,19]});
- if(!passengerLiveMarker){passengerLiveMarker=L.marker(point,{icon,zIndexOffset:1100}).addTo(map).bindPopup('موقع الراكب المباشر');map.setView(point,15)}
+ passengerCurrentPoint=point;
+ if(!passengerLiveMarker){passengerLiveMarker=L.marker(point,{icon,zIndexOffset:1100}).addTo(map).bindPopup('موقع الراكب المباشر')}
  else passengerLiveMarker.setLatLng(point);
  if(driverCurrentPoint)calculatePassengerRoute(driverCurrentPoint,point);
 }
@@ -747,9 +753,10 @@ async function calculatePassengerRoute(driverPoint,passengerPoint){
  }
 }
 function showLiveMap(){
- closePanels();toggleMenu(false);
- if(map){setTimeout(()=>map.invalidateSize(),200);}
- message('driverStatus','الخريطة تعرض موقع الراكب المباشر عند وصول تحديث موقعه.');
+ closePanels();toggleMenu(false);hideDriverSearch();
+ el('app').classList.add('driver-mode');
+ if(map){setTimeout(()=>{map.invalidateSize(true);if(driverCurrentPoint&&passengerCurrentPoint){map.fitBounds(L.latLngBounds(driverCurrentPoint,passengerCurrentPoint),{padding:[65,100],maxZoom:16});}else if(driverCurrentPoint){map.setView(driverCurrentPoint,16);}else if(passengerCurrentPoint){map.setView(passengerCurrentPoint,16);}},350);}
+ message('driverStatus','وضع السائق: الخريطة كاملة، وموقع الراكب المباشر يظهر عند وصول تحديثه.');
 }
 function stopDriverMapTracking(){
  if(driverLiveMarker&&map){map.removeLayer(driverLiveMarker);driverLiveMarker=null}
@@ -806,6 +813,7 @@ function showDriverPanel(){
  toggleMenu(false);closePanels();
  if(!user){showLogin('login');return}
  if(!profile||profile.role!=='driver'||profile.approved!==true){alert('هذا الحساب ليس حساب سائق معتمداً بعد.');return}
+ el('app').classList.add('driver-mode');
  el('driverPanel').style.display='block';
  el('driverPanel').style.background='rgba(255,255,255,.93)';
  unlockDriverAudio();
@@ -952,7 +960,8 @@ async function acceptRide(rideId){
   });
   startDriverLocationSharing(rideId);
   dismissDriverAlert();
-  alert('تم قبول الرحلة بنجاح.');
+  showLiveMap();
+  alert('تم قبول الرحلة بنجاح. انتقلت الآن إلى خريطة السائق الكاملة.');
  }catch(e){alert('تعذر قبول الرحلة: '+(e.code||'')+' — '+e.message)}
 }
 
