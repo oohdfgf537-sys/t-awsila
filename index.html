@@ -100,6 +100,15 @@ input,select{font-family:inherit}
 .card p{margin:6px 0;font-size:14px;line-height:1.6}
 .small-btn{padding:10px 14px;background:var(--pink);color:white;border-radius:10px;margin-top:8px}
 .btn{width:100%;background:linear-gradient(90deg,#f52b88,#d91669);color:white;border-radius:13px;padding:15px;margin-top:12px;font-size:16px;font-weight:bold}
+#driverRideAlert{display:none;position:absolute;z-index:1100;top:78px;left:50%;transform:translateX(-50%);width:min(360px,92vw);background:#fff;border:2px solid var(--pink);border-radius:18px;padding:14px;box-shadow:0 8px 30px #0003;text-align:right}
+#driverRideAlert.visible{display:block;animation:searchPop .25s ease-out}
+#driverRideAlert h3{margin:0 0 8px;color:var(--pink);font-size:17px}
+#driverRideAlert p{font-size:13px;line-height:1.6;margin:5px 0}
+#driverRideAlert .alert-actions{display:flex;gap:8px;margin-top:10px}
+#driverRideAlert button{flex:1;border-radius:10px;padding:11px;background:var(--pink);color:white;font-weight:bold}
+#driverRideAlert button.secondary{background:#eee;color:#333}
+.driver-map-car{font-size:34px;text-shadow:0 2px 5px #0004}
+.driver-live-info{background:#fff;border:1px solid #f2cddd;border-radius:12px;padding:10px;margin:10px 0;color:#333;font-size:13px;line-height:1.6}
 .hidden{display:none!important}
 .auth-switch{display:flex;gap:8px;margin:12px 0}
 .auth-switch button{flex:1;padding:12px;border-radius:10px;background:#fff0f6;color:#333}
@@ -137,7 +146,14 @@ input,select{font-family:inherit}
   <p id="driverSearchDetail">نبحث عن سائق لقبول رحلتك</p>
   <div id="driverSearchClock">00:00</div>
  </div>
-
+ <div id="driverRideAlert" role="alert" aria-live="assertive">
+  <h3>🔔 طلب رحلة جديد</h3>
+  <div id="driverRideAlertDetails">وصل طلب جديد.</div>
+  <div class="alert-actions">
+   <button id="driverRideAccept" type="button">قبول الرحلة</button>
+   <button class="secondary" type="button" onclick="dismissDriverAlert()">إغلاق</button>
+  </div>
+ </div>
  <aside id="menu">
   <h2>FERRARI | فيراري</h2>
   <p id="accountInfo">مرحباً بك</p>
@@ -267,6 +283,9 @@ let searchResults={pickup:[],destination:[]},selectedCar='standard';
 let estimatedDistance=null,estimatedPrice=null,mapSelectionMode=null;
 let searchTimers={pickup:null,destination:null};
 let searchStartedAt=null,searchTimerInterval=null;
+let driverLocationWatchId=null,driverTrackingRideId=null,driverLiveMarker=null,driverLiveRoute=null;
+let customerRidePickup=null,lastEtaFetchAt=0,lastEtaPoint=null,pendingRideIds=new Set(),pendingFirstSnapshot=true;
+let activeDriverAlertRideId=null,driverAudioContext=null,driverAudioReady=false;
 
 firebase.initializeApp(firebaseConfig);
 auth=firebase.auth();db=firebase.firestore();
@@ -556,9 +575,13 @@ async function requestRide(){
     const acceptedDetail='تم قبول الرحلة'+(ride.driverName?' — السائق: '+ride.driverName:'')+(ride.vehicleType?' — السيارة: '+ride.vehicleType:'');
     el('rideSearchStatus').textContent='✅ '+acceptedDetail+(ride.driverPhone?' — التواصل: '+ride.driverPhone:'');
     showDriverSearch('تم العثور على سائق ✓',acceptedDetail,true);
+    const parts=String(ride.pickup||'').split(',').map(Number);
+    customerRidePickup=parts.length===2&&parts.every(Number.isFinite)?{lat:parts[0],lng:parts[1]}:null;
+    if(ride.driverLocation)updateCustomerDriverLocation(ride.driverLocation);
+    else el('rideSearchStatus').textContent+=' — بانتظار موقع السائق...';
    }else if(ride.status==='completed'){
     el('rideSearchStatus').textContent='🏁 اكتملت رحلتك. شكراً لاستخدام فيراري.';
-    hideDriverSearch();
+    stopDriverMapTracking();customerRidePickup=null;hideDriverSearch();
    }
   },error=>{el('rideSearchStatus').textContent='تم إرسال الطلب، لكن تعذر تحديث حالة البحث: '+error.message;});
   message('status','تم إرسال طلبك بنجاح.');
@@ -593,12 +616,103 @@ function showMyRides(){
  },e=>list.textContent='تعذر تحميل الرحلات: '+e.message);
 }
 
+/* تنبيهات الرحلات ومشاركة الموقع المباشر */
+function unlockDriverAudio(){
+ try{
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  if(!driverAudioContext)driverAudioContext=new AC();
+  if(driverAudioContext.state==='suspended')driverAudioContext.resume();
+  driverAudioReady=true;
+ }catch(e){console.warn('Audio unavailable',e)}
+}
+function playDriverAlertSound(){
+ try{
+  if(!driverAudioReady)unlockDriverAudio();
+  if(!driverAudioContext)return;
+  const ctx=driverAudioContext;
+  [0,0.24,0.48].forEach((delay,i)=>{
+   const osc=ctx.createOscillator(),gain=ctx.createGain();
+   osc.type='sine';osc.frequency.value=i===1?990:790;
+   gain.gain.setValueAtTime(0.0001,ctx.currentTime+delay);
+   gain.gain.exponentialRampToValueAtTime(0.22,ctx.currentTime+delay+0.025);
+   gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+delay+0.19);
+   osc.connect(gain);gain.connect(ctx.destination);osc.start(ctx.currentTime+delay);osc.stop(ctx.currentTime+delay+0.2);
+  });
+ }catch(e){console.warn('Alert sound failed',e)}
+}
+function notifyDriverNewRide(rideId,r){
+ activeDriverAlertRideId=rideId;
+ el('driverRideAlertDetails').innerHTML='<p><b>من:</b> '+escapeHtml(r.pickupName||r.pickup||'غير محدد')+'</p><p><b>إلى:</b> '+escapeHtml(r.destinationName||r.destination||'غير محدد')+'</p><p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>';
+ el('driverRideAlert').classList.add('visible');
+ el('driverRideAccept').onclick=()=>acceptRide(rideId);
+ playDriverAlertSound();
+ if('Notification' in window&&Notification.permission==='granted'){
+  try{new Notification('رحلة جديدة في فيراري',{body:(r.pickupName||'موقع الانطلاق')+' ← '+(r.destinationName||'الوجهة'),tag:'ferrari-'+rideId})}catch(e){}
+ }
+}
+function dismissDriverAlert(){el('driverRideAlert').classList.remove('visible');activeDriverAlertRideId=null}
+function startDriverLocationSharing(rideId){
+ if(!navigator.geolocation){message('driverStatus','هذا المتصفح لا يدعم تحديد الموقع.');return}
+ if(driverTrackingRideId===rideId&&driverLocationWatchId!==null)return;
+ stopDriverLocationSharing();driverTrackingRideId=rideId;
+ message('driverStatus','🟢 مشاركة موقعك مباشرة مع الراكب أثناء الرحلة.');
+ driverLocationWatchId=navigator.geolocation.watchPosition(async pos=>{
+  if(!user||driverTrackingRideId!==rideId)return;
+  const latitude=pos.coords.latitude,longitude=pos.coords.longitude;
+  try{
+   await db.collection('rides').doc(rideId).update({driverLocation:{latitude,longitude,accuracy:pos.coords.accuracy||0,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
+  }catch(e){console.warn('تعذر تحديث موقع السائق:',e);message('driverStatus','تعذر تحديث الموقع: '+e.message)}
+ },err=>{message('driverStatus','تعذر الوصول إلى موقعك. اسمح للموقع من إعدادات المتصفح ثم أعد فتح التطبيق.');console.warn(err)},
+ {enableHighAccuracy:true,maximumAge:5000,timeout:20000});
+}
+function stopDriverLocationSharing(){
+ if(driverLocationWatchId!==null&&navigator.geolocation)navigator.geolocation.clearWatch(driverLocationWatchId);
+ driverLocationWatchId=null;driverTrackingRideId=null;
+}
+function stopDriverMapTracking(){
+ if(driverLiveMarker&&map){map.removeLayer(driverLiveMarker);driverLiveMarker=null}
+ if(driverLiveRoute&&map){map.removeLayer(driverLiveRoute);driverLiveRoute=null}
+ lastEtaPoint=null;lastEtaFetchAt=0;
+}
+function updateCustomerDriverLocation(loc){
+ if(!map||!loc||!Number.isFinite(Number(loc.latitude))||!Number.isFinite(Number(loc.longitude)))return;
+ const point=L.latLng(Number(loc.latitude),Number(loc.longitude));
+ const icon=L.divIcon({className:'',html:'<div class="driver-map-car">🚘</div>',iconSize:[42,42],iconAnchor:[21,21]});
+ if(!driverLiveMarker){driverLiveMarker=L.marker(point,{icon,zIndexOffset:1000}).addTo(map).bindPopup('موقع السائق المباشر');map.setView(point,15)}
+ else driverLiveMarker.setLatLng(point);
+ const now=Date.now();
+ if(customerRidePickup&&(!lastEtaPoint||point.distanceTo(lastEtaPoint)>120||now-lastEtaFetchAt>20000)){
+  lastEtaPoint=point;lastEtaFetchAt=now;calculateDriverEta(point,customerRidePickup);
+ }
+}
+async function calculateDriverEta(driverPoint,pickupPoint){
+ try{
+  const url='https://router.project-osrm.org/route/v1/driving/'+driverPoint.lng+','+driverPoint.lat+';'+pickupPoint.lng+','+pickupPoint.lat+'?overview=full&geometries=geojson';
+  const response=await fetch(url);if(!response.ok)throw new Error('route unavailable');
+  const data=await response.json();if(!data.routes||!data.routes.length)throw new Error('no route');
+  const r=data.routes[0],minutes=Math.max(1,Math.ceil(r.duration/60));
+  const firstRoute=!driverLiveRoute;
+  if(driverLiveRoute)map.removeLayer(driverLiveRoute);
+  driverLiveRoute=L.geoJSON(r.geometry,{style:{color:'#1687e8',weight:5,opacity:.9,dashArray:'8 7'}}).addTo(map);
+  if(firstRoute)map.fitBounds(driverLiveRoute.getBounds(),{padding:[55,55],maxZoom:15});
+  el('rideSearchStatus').textContent='🚘 السائق يقترب — الوقت التقريبي للوصول: '+minutes+' دقيقة ('+(r.distance/1000).toFixed(1)+' كم بالطريق).';
+ }catch(e){
+  const km=driverPoint.distanceTo(L.latLng(pickupPoint.lat,pickupPoint.lng))/1000;
+  const minutes=Math.max(1,Math.ceil(km/25*60));
+  el('rideSearchStatus').textContent='🚘 موقع السائق مباشر — الوقت التقريبي للوصول: '+minutes+' دقيقة تقريباً.';
+ }
+}
+
 /* لوحة السائق */
 function showDriverPanel(){
  toggleMenu(false);closePanels();
  if(!user){showLogin('login');return}
  if(!profile||profile.role!=='driver'||profile.approved!==true){alert('هذا الحساب ليس حساب سائق معتمداً بعد.');return}
  el('driverPanel').style.display='block';
+ el('driverPanel').style.background='rgba(255,255,255,.93)';
+ unlockDriverAudio();
+ if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});
  el('driverName').value=localStorage.getItem('ferrariDriverName')||'';
  el('vehicleType').value=localStorage.getItem('ferrariVehicleType')||'';
  message('driverStatus','مرحباً بك في لوحة السائق المعتمد.');loadPendingRides();loadActiveRides();
@@ -612,9 +726,10 @@ function saveDriverInfo(){
 function loadPendingRides(){
  const box=el('pendingRides');box.innerHTML='<p>جارٍ تحميل الطلبات...</p>';
  if(driverListener)driverListener();
+ pendingFirstSnapshot=true;pendingRideIds=new Set();
  driverListener=db.collection('rides').where('status','==','pending').onSnapshot(snapshot=>{
   box.innerHTML='';
-  if(snapshot.empty){box.innerHTML='<p>لا توجد رحلات متاحة حالياً.</p>';return}
+  if(snapshot.empty){box.innerHTML='<p>لا توجد رحلات متاحة حالياً.</p>';pendingFirstSnapshot=false;return}
   snapshot.forEach(doc=>{
    const r=doc.data(),card=document.createElement('div');card.className='card';
    card.innerHTML=
@@ -625,7 +740,10 @@ function loadPendingRides(){
     '<p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>'+
     '<button class="small-btn">قبول الرحلة</button>';
    card.querySelector('button').addEventListener('click',()=>acceptRide(doc.id));box.appendChild(card);
+   if(!pendingFirstSnapshot&&!pendingRideIds.has(doc.id))notifyDriverNewRide(doc.id,r);
+   pendingRideIds.add(doc.id);
   });
+  pendingFirstSnapshot=false;
  },e=>box.textContent='تعذر تحميل الرحلات: '+e.message);
 }
 function loadActiveRides(){
@@ -655,11 +773,13 @@ function loadActiveRides(){
   .onSnapshot(snapshot=>{
    box.innerHTML='';
    if(snapshot.empty){
+    stopDriverLocationSharing();
     box.innerHTML='<p>لا توجد رحلات مقبولة قيد التنفيذ حالياً.</p>';
     return;
    }
    snapshot.forEach(doc=>{
     const r=doc.data(),card=document.createElement('div');
+    startDriverLocationSharing(doc.id);
     card.className='card';
     card.innerHTML=
      '<p><b>من:</b> '+escapeHtml(r.pickupName||r.pickup||'')+'</p>'+
@@ -716,6 +836,7 @@ async function completeRide(rideId){
    alert('لا يمكن إنهاء هذه الرحلة. تحقق من أنها مقبولة باسمك.');return;
   }
   await ref.update({status:'completed'});
+  stopDriverLocationSharing();
   alert('تم إنهاء الرحلة بنجاح.');
  }catch(e){alert('تعذر إنهاء الرحلة: '+(e.code||'')+' — '+e.message)}
 }
@@ -728,6 +849,8 @@ async function acceptRide(rideId){
   await db.collection('rides').doc(rideId).update({
    status:'accepted',driverId:user.uid,driverName:name,vehicleType:vehicle,driverPhone:user.email||''
   });
+  startDriverLocationSharing(rideId);
+  dismissDriverAlert();
   alert('تم قبول الرحلة بنجاح.');
  }catch(e){alert('تعذر قبول الرحلة: '+(e.code||'')+' — '+e.message)}
 }
@@ -763,6 +886,7 @@ async function logout(){
  if(driverListener){driverListener();driverListener=null}
  if(activeRidesListener){activeRidesListener();activeRidesListener=null}
  if(currentRideListener){currentRideListener();currentRideListener=null}
+ stopDriverLocationSharing();stopDriverMapTracking();dismissDriverAlert();
  hideDriverSearch();
  try{
   await auth.signOut();profile=null;user=null;
