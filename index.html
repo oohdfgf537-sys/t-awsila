@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -171,26 +170,6 @@ input,select{font-family:inherit}
 #completionRating .rating-hint{font-size:12px;color:#88717d;margin:5px 0}
 #completionRating .rating-save{margin-top:8px}
 
-
-/* لوحة إدارة FERRARI */
-.admin-wrap{max-width:760px;margin:0 auto;padding-bottom:24px}
-.admin-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.admin-top h2{margin:8px 0;color:var(--pink)}
-.admin-refresh{background:#fff0f6;color:var(--pink);border:1px solid #f2cddd;border-radius:12px;padding:11px 14px;font-weight:bold}
-.admin-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
-.admin-stat{background:#fff1f7;border:1px solid #f2d1df;border-radius:14px;padding:13px 7px;text-align:center}
-.admin-stat strong{display:block;color:var(--pink);font-size:22px}
-.admin-stat span{display:block;color:#776b72;font-size:11px;margin-top:4px}
-.admin-section{margin-top:20px}
-.admin-section h3{font-size:16px;color:var(--pink);border-bottom:1px solid #f2d1df;padding-bottom:8px}
-.admin-item{background:#fff8fb;border:1px solid #f2d1df;border-radius:13px;padding:12px;margin:9px 0;overflow-wrap:anywhere}
-.admin-item p{font-size:13px;line-height:1.65;margin:4px 0}
-.admin-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.admin-actions button{border-radius:10px;padding:10px 13px;font-weight:bold;background:var(--pink);color:#fff}
-.admin-actions button.alt{background:#fff;color:var(--pink);border:1px solid #edb5ce}
-.admin-empty{font-size:13px;color:#888;padding:10px}
-@media(max-width:420px){.admin-stats{grid-template-columns:1fr 1fr}.admin-stat:last-child{grid-column:span 2}}
-
 </style>
 </head>
 <body>
@@ -236,7 +215,6 @@ input,select{font-family:inherit}
   <button class="menuitem" onclick="showMyRides()">🚘 رحلاتي</button>
   <button class="menuitem" onclick="showDriverPanel()">🚖 لوحة السائق</button>
   <button class="menuitem" onclick="showDriverApplication()">📝 التسجيل كسائق</button>
-  <button id="adminMenuButton" class="menuitem hidden" onclick="showAdminPanel()">👑 لوحة الإدارة</button>
   <button class="menuitem" onclick="closePanels();toggleMenu(false)">إغلاق القائمة ✕</button>
   <button class="menuitem" onclick="logout()">تسجيل الخروج</button>
  </aside>
@@ -342,16 +320,6 @@ input,select{font-family:inherit}
  <button class="btn" onclick="submitDriverApplication()">إرسال طلب التسجيل</button>
  <p id="applicationMessage" class="msg"></p>
 </section>
-<section id="adminPanel" class="panel">
- <div class="admin-wrap">
-  <div class="panel-head"><button class="circle" onclick="closePanels()">←</button><div class="admin-top"><h2>لوحة إدارة FERRARI</h2><button class="admin-refresh" type="button" onclick="loadAdminDashboard()">تحديث البيانات ↻</button></div></div>
-  <p id="adminStatus" class="msg">مرحباً بك في لوحة الإدارة.</p>
-  <div id="adminStats" class="admin-stats"></div>
-  <div class="admin-section"><h3>📝 طلبات تسجيل السائقين</h3><div id="adminApplications"><p class="admin-empty">جارٍ التحميل...</p></div></div>
-  <div class="admin-section"><h3>🚘 متابعة الرحلات</h3><div id="adminRides"><p class="admin-empty">جارٍ التحميل...</p></div></div>
-  <div class="admin-section"><h3>👥 المستخدمون</h3><div id="adminUsers"><p class="admin-empty">جارٍ التحميل...</p></div></div>
- </div>
-</section>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -366,7 +334,7 @@ const firebaseConfig={
  messagingSenderId:"200480445099",
  appId:"1:200480445099:web:2be93d9778ba54c84b1dee"
 };
-let auth=null,db=null,user=null,profile=null,isAdmin=false;
+let auth=null,db=null,user=null,profile=null;
 let authMode='login',map=null,start=null,end=null,route=null,userMarker=null;
 let startMarker=null,endMarker=null,ridesListener=null,driverListener=null,activeRidesListener=null,currentRideListener=null;
 let searchResults={pickup:[],destination:[]},selectedCar='standard';
@@ -383,16 +351,8 @@ auth=firebase.auth();db=firebase.firestore();
 
 auth.onAuthStateChanged(async u=>{
  user=u;
- if(u){
-  try{
-   await loadAccountAccess();
-   if(isAdmin&&el('app').style.display==='block')showAdminPanel();
-  }catch(e){console.error('Account access check failed:',e);message('message','تعذر التحقق من صلاحيات الحساب: '+e.message);}
- }else{
-  profile=null;isAdmin=false;
-  if(el('adminMenuButton'))el('adminMenuButton').classList.add('hidden');
-  el('accountInfo').textContent='مرحباً بك';
- }
+ if(u){await loadProfile();await updateAccountInfo();}
+ else{profile=null;el('accountInfo').textContent='مرحباً بك';}
 });
 function el(id){return document.getElementById(id)}
 function message(id,text){el(id).textContent=text}
@@ -466,18 +426,6 @@ function chooseSearchResult(type,index){
 function setPoint(type,point,name){
  if(type==='pickup'){
   start=point;if(startMarker)map.removeLayer(startMarker);
-كلما طالت هذه المحادثة، قد تغيب عن ChatGPT بعض التفاصيل السابقة في الدردشة. قم بالترقية للحصول على سياق أوسع في كل محادثة.
-
-
-
-
-
-
-
-
-
-
-
   startMarker=L.marker(point).addTo(map).bindPopup('نقطة الانطلاق').openPopup();
   window.pickupName=name||'موقع الانطلاق';message('status','تم تحديد الانطلاق. اختر الوجهة.');
  }else{
@@ -548,7 +496,7 @@ function showLogin(mode='login'){
  openApp();closePanels();toggleMenu(false);el('login').style.display='block';setAuthMode(mode);
 }
 function closeLogin(){el('login').style.display='none'}
-function closePanels(){['login','myRides','driverPanel','driverApplication','adminPanel'].forEach(id=>{el(id).style.display='none'})}
+function closePanels(){['login','myRides','driverPanel','driverApplication'].forEach(id=>{el(id).style.display='none'})}
 function setAuthMode(mode){
  authMode=mode;const isRegister=mode==='register';
  el('authTitle').textContent=isRegister?'إنشاء حساب جديد':'تسجيل الدخول';
@@ -567,10 +515,10 @@ async function submitAuth(){
   if(authMode==='register'){
    const confirm=el('confirmPassword').value;
    if(password!==confirm){msg.textContent='كلمتا المرور غير متطابقتين.';return}
-   const result=await auth.createUserWithEmailAndPassword(email,password);user=result.user;await loadAccountAccess();
+   const result=await auth.createUserWithEmailAndPassword(email,password);user=result.user;await loadProfile();
    msg.textContent='تم إنشاء الحساب بنجاح.';
   }else{
-   const result=await auth.signInWithEmailAndPassword(email,password);user=result.user;await loadAccountAccess();
+   const result=await auth.signInWithEmailAndPassword(email,password);user=result.user;await loadProfile();
    msg.textContent='تم تسجيل الدخول بنجاح.';
   }
   closeLogin();el('app').style.display='block';el('intro').style.display='none';initMap();showHomeForRole();
@@ -615,19 +563,6 @@ function savePlace(type){
 }
 
 /* بيانات المستخدم */
-async function loadAccountAccess(){
- if(!user||!db)return;
- // يتم التحقق من وثيقة admins أولاً، قبل إنشاء ملف مستخدم عادي.
- const adminSnap=await db.collection('admins').doc(user.uid).get();
- isAdmin=adminSnap.exists&&adminSnap.data().role==='admin';
- if(el('adminMenuButton'))el('adminMenuButton').classList.toggle('hidden',!isAdmin);
- if(isAdmin){
-  profile={role:'admin',email:user.email||''};
-  await updateAccountInfo();
-  return;
- }
- await loadProfile();
-}
 async function loadProfile(){
  if(!user||!db)return;
  try{
@@ -643,7 +578,6 @@ async function loadProfile(){
  }catch(e){console.error('Profile error:',e);message('message','تعذر تحميل بيانات الحساب: '+e.message)}
 }
 function showHomeForRole(){
- if(isAdmin){showAdminPanel();return;}
  if(profile&&profile.role==='driver'){
   if(profile.approved===true)showDriverPanel();
   else alert('حساب السائق بانتظار اعتماد الإدارة.');
@@ -722,7 +656,6 @@ async function submitCompletionRating(){
 }
 async function updateAccountInfo(){
  if(!user||!db)return;
- if(isAdmin){el('accountInfo').textContent='المدير: '+(user.email||'');return;}
  try{const snap=await db.collection('users').doc(user.uid).collection('ratings').get();let total=0,count=0;snap.forEach(d=>{const n=Number(d.data().stars);if(n>=1&&n<=5){total+=n;count++;}});el('accountInfo').textContent='الحساب: '+(user.email||'')+(count?'  •  ⭐ '+(total/count).toFixed(1)+' ('+count+' تقييم)':'  •  لا توجد تقييمات بعد');}
  catch(e){el('accountInfo').textContent='الحساب: '+(user.email||'');console.warn('تعذر تحميل متوسط التقييم:',e);}
 }
@@ -945,19 +878,6 @@ async function calculatePassengerRoute(driverPoint,passengerPoint){
  }
 }
 function showLiveMap(){
-كلما طالت هذه المحادثة، قد تغيب عن ChatGPT بعض التفاصيل السابقة في الدردشة. قم بالترقية للحصول على سياق أوسع في كل محادثة.
-
-
-
-
-
-
-
-
-
-
-
-
  closePanels();toggleMenu(false);hideDriverSearch();
  el('app').classList.add('driver-mode');
  if(map){setTimeout(()=>{map.invalidateSize(true);if(driverCurrentPoint&&passengerCurrentPoint){map.fitBounds(L.latLngBounds(driverCurrentPoint,passengerCurrentPoint),{padding:[65,100],maxZoom:16});}else if(driverCurrentPoint){map.setView(driverCurrentPoint,16);}else if(passengerCurrentPoint){map.setView(passengerCurrentPoint,16);}},350);}
@@ -1243,134 +1163,6 @@ async function acceptRide(rideId){
  }catch(e){alert('تعذر قبول الرحلة: '+(e.code||'')+' — '+e.message)}
 }
 
-/* لوحة الإدارة: لا تظهر إلا بعد التحقق من admins/{uid} */
-function showAdminPanel(){
- if(!user||!isAdmin){alert('هذا الحساب لا يملك صلاحية الإدارة.');return;}
- toggleMenu(false);closePanels();
- el('app').classList.remove('driver-mode','ride-accepted');
- el('adminPanel').style.display='block';
- loadAdminDashboard();
-}
-function adminStat(value,label){
- const box=document.createElement('div');box.className='admin-stat';
- const strong=document.createElement('strong');strong.textContent=String(value);
- const span=document.createElement('span');span.textContent=label;
- box.append(strong,span);return box;
-}
-function adminButton(label,handler,alt=false){
- const b=document.createElement('button');b.type='button';b.textContent=label;
- if(alt)b.className='alt';b.addEventListener('click',handler);return b;
-}
-function adminItem(title,lines,actions=[]){
- const box=document.createElement('div');box.className='admin-item';
- const h=document.createElement('p');h.textContent=title;h.style.fontWeight='bold';h.style.color='#c91662';box.appendChild(h);
- lines.filter(Boolean).forEach(line=>{const p=document.createElement('p');p.textContent=line;box.appendChild(p);});
- if(actions.length){const row=document.createElement('div');row.className='admin-actions';actions.forEach(a=>row.appendChild(a));box.appendChild(row);}
- return box;
-}
-function adminEmpty(box,text){
- box.innerHTML='';const p=document.createElement('p');p.className='admin-empty';p.textContent=text;box.appendChild(p);
-}
-async function loadAdminDashboard(){
- if(!user||!isAdmin){message('adminStatus','انتهت صلاحية جلسة الإدارة. سجّل الدخول مجدداً.');return;}
- message('adminStatus','جارٍ تحميل بيانات التطبيق...');
- const appsBox=el('adminApplications'),ridesBox=el('adminRides'),usersBox=el('adminUsers');
- [appsBox,ridesBox,usersBox].forEach(b=>adminEmpty(b,'جارٍ التحميل...'));
- try{
-  const results=await Promise.all([
-   db.collection('users').get(),
-   db.collection('driverApplications').get(),
-   db.collection('rides').get()
-  ]);
-  const users=results[0].docs,apps=results[1].docs,rides=results[2].docs;
-  const pendingApps=apps.filter(d=>(d.data().status||'pending')==='pending');
-  const activeRides=rides.filter(d=>['pending','accepted'].includes(d.data().status));
-  el('adminStats').replaceChildren(
-   adminStat(users.length,'إجمالي المستخدمين'),
-   adminStat(pendingApps.length,'طلبات السائقين المعلقة'),
-   adminStat(activeRides.length,'الرحلات النشطة')
-  );
-
-  adminEmpty(appsBox,pendingApps.length?'':'لا توجد طلبات سائقين معلقة.');
-  pendingApps.forEach(doc=>{
-   const a=doc.data();
-   const approve=adminButton('قبول السائق',()=>approveDriverApplication(doc.id,a));
-   const reject=adminButton('رفض الطلب',()=>rejectDriverApplication(doc.id),true);
-   appsBox.appendChild(adminItem(a.name||'طلب سائق',[
-    'البريد: '+(a.email||'غير متوفر'),
-    'السيارة: '+(a.vehicleType||'غير محددة'),
-    'الحالة: '+(a.status||'pending')
-   ],[approve,reject]));
-  });
-
-  const sortedRides=rides.slice().sort((a,b)=>{
-   const ta=a.data().createdAt&&a.data().createdAt.toMillis?a.data().createdAt.toMillis():0;
-   const tb=b.data().createdAt&&b.data().createdAt.toMillis?b.data().createdAt.toMillis():0;
-   return tb-ta;
-  }).slice(0,60);
-  adminEmpty(ridesBox,sortedRides.length?'':'لا توجد رحلات حتى الآن.');
-  sortedRides.forEach(doc=>{
-   const r=doc.data(),status={pending:'بانتظار سائق',accepted:'قيد التنفيذ',completed:'مكتملة',cancelled:'ملغاة'}[r.status]||r.status||'غير معروف';
-   const actions=[];
-   if(['pending','accepted'].includes(r.status)){
-    actions.push(adminButton('إلغاء الرحلة',()=>adminCancelRide(doc.id),true));
-   }
-   ridesBox.appendChild(adminItem('رحلة — '+status,[
-    'من: '+(r.pickupName||r.pickup||'غير محدد'),
-    'إلى: '+(r.destinationName||r.destination||'غير محدد'),
-    'السعر: '+Number(r.price||0).toFixed(2)+' د.ل',
-    'معرّف الراكب: '+(r.customerId||'غير متوفر')
-   ],actions));
-  });
-
-  const sortedUsers=users.slice().sort((a,b)=>{
-   const da=a.data(),dbb=b.data();return String(da.email||'').localeCompare(String(dbb.email||''));
-  });
-  adminEmpty(usersBox,sortedUsers.length?'':'لا يوجد مستخدمون.');
-  sortedUsers.forEach(doc=>{
-   const u=doc.data(),role=u.role==='driver'?'سائق':u.role==='admin'?'مدير':'راكب';
-   usersBox.appendChild(adminItem(u.name||u.driverName||u.email||'مستخدم',[
-    'البريد: '+(u.email||'غير متوفر'),
-    'النوع: '+role,
-    'اعتماد السائق: '+(u.role==='driver'?(u.approved===true?'معتمد':'غير معتمد'):'—'),
-    'UID: '+doc.id
-   ]));
-  });
-  message('adminStatus','تم تحميل بيانات الإدارة بنجاح.');
- }catch(e){
-  message('adminStatus','تعذر تحميل لوحة الإدارة: '+(e.code||'')+' — '+e.message);
-  [appsBox,ridesBox,usersBox].forEach(b=>{if(b.textContent.includes('جارٍ'))adminEmpty(b,'تعذر التحميل. اضغط تحديث البيانات.');});
- }
-}
-async function approveDriverApplication(uid,application){
- if(!user||!isAdmin)return;
- if(!confirm('هل تريد اعتماد هذا السائق؟'))return;
- try{
-  const userRef=db.collection('users').doc(uid),userSnap=await userRef.get();
-  if(!userSnap.exists)throw new Error('لا يوجد ملف مستخدم لهذا الطلب؛ لم يتم إجراء أي تغيير.');
-  await userRef.update({role:'driver',approved:true,driverName:application.name||'',vehicleType:application.vehicleType||''});
-  await db.collection('driverApplications').doc(uid).update({status:'approved',reviewedAt:firebase.firestore.FieldValue.serverTimestamp(),reviewedBy:user.uid});
-  message('adminStatus','تم اعتماد السائق بنجاح.');
-  await loadAdminDashboard();
- }catch(e){message('adminStatus','تعذر اعتماد السائق: '+(e.code||'')+' — '+e.message);}
-}
-async function rejectDriverApplication(uid){
- if(!user||!isAdmin||!confirm('هل تريد رفض طلب السائق؟'))return;
- try{
-  await db.collection('driverApplications').doc(uid).update({status:'rejected',reviewedAt:firebase.firestore.FieldValue.serverTimestamp(),reviewedBy:user.uid});
-  message('adminStatus','تم رفض الطلب.');
-  await loadAdminDashboard();
- }catch(e){message('adminStatus','تعذر رفض الطلب: '+(e.code||'')+' — '+e.message);}
-}
-async function adminCancelRide(rideId){
- if(!user||!isAdmin||!confirm('هل تريد إلغاء هذه الرحلة؟'))return;
- try{
-  await db.collection('rides').doc(rideId).update({status:'cancelled',cancelledBy:user.uid,adminCancelled:true});
-  message('adminStatus','تم إلغاء الرحلة.');
-  await loadAdminDashboard();
- }catch(e){message('adminStatus','تعذر إلغاء الرحلة: '+(e.code||'')+' — '+e.message);}
-}
-
 /* التسجيل كسائق */
 function showDriverApplication(){
  toggleMenu(false);closePanels();
@@ -1405,7 +1197,7 @@ async function logout(){
  stopDriverLocationSharing();stopDriverMapTracking();dismissDriverAlert();
  hideDriverSearch();
  try{
-  await auth.signOut();profile=null;user=null;isAdmin=false;if(el('adminMenuButton'))el('adminMenuButton').classList.add('hidden');
+  await auth.signOut();profile=null;user=null;
   el('app').style.display='none';el('intro').style.display='block';
  }catch(e){alert('تعذر تسجيل الخروج: '+e.message)}
 }
@@ -1424,15 +1216,3 @@ if("serviceWorker" in navigator){
 </script>
 </body>
 </html>
-كلما طالت هذه المحادثة، قد تغيب عن ChatGPT بعض التفاصيل السابقة في الدردشة. قم بالترقية للحصول على سياق أوسع في كل محادثة.
-
-
-
-
-
-
-
-
-
-
-
