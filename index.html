@@ -33,6 +33,21 @@ input,select{font-family:inherit}
 .wallet{padding:12px 15px;border-radius:25px;background:white;box-shadow:0 3px 15px #0002;font-weight:bold;font-size:13px}
 .wallet b{color:var(--pink)}
 .locate-btn{position:absolute;z-index:550;left:15px;top:78px;width:47px;height:47px;border-radius:50%;background:white;color:var(--pink);font-size:23px;box-shadow:0 3px 15px #0002}
+
+/* نافذة البحث عن سائق فوق الخريطة */
+#driverSearchOverlay{display:none;position:absolute;z-index:520;top:34%;left:50%;transform:translate(-50%,-50%);width:min(290px,84vw);padding:18px 16px 15px;background:rgba(255,255,255,.97);border:1px solid #f6d5e4;border-radius:22px;box-shadow:0 8px 30px #29252a26;text-align:center;backdrop-filter:blur(8px)}
+#driverSearchOverlay.visible{display:block;animation:searchPop .28s ease-out}
+.search-car-ring{width:92px;height:92px;margin:0 auto 12px;border:4px solid #ffe0ed;border-top-color:var(--pink);border-right-color:var(--pink);border-radius:50%;display:grid;place-items:center;animation:searchSpin 1.35s linear infinite}
+.search-car{font-size:43px;line-height:1;animation:searchCounter 1.35s linear infinite}
+#driverSearchTitle{font-size:17px;font-weight:bold;color:var(--pink);margin:4px 0 7px}
+#driverSearchDetail{font-size:12px;color:#777;line-height:1.6;margin:0}
+#driverSearchClock{font-size:22px;font-weight:bold;letter-spacing:1px;color:#29252a;margin-top:9px;font-variant-numeric:tabular-nums}
+#driverSearchOverlay.accepted .search-car-ring{animation:none;border-color:#d7f4e3;background:#f1fff6}
+#driverSearchOverlay.accepted .search-car{animation:none}
+@keyframes searchSpin{to{transform:rotate(360deg)}}
+@keyframes searchCounter{to{transform:rotate(-360deg)}}
+@keyframes searchPop{from{opacity:0;transform:translate(-50%,-45%) scale(.94)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+
 .map-hint{position:absolute;z-index:450;top:76px;right:50%;transform:translateX(50%);background:#fff;border-radius:25px;padding:9px 14px;box-shadow:0 3px 15px #0002;font-size:12px;white-space:nowrap;color:#555}
 .sheet{position:absolute;bottom:0;right:0;left:0;z-index:600;background:white;border-radius:25px 25px 0 0;padding:10px 17px calc(15px + env(safe-area-inset-bottom));box-shadow:0 -5px 25px #0002;max-height:78%;overflow-y:auto}
 .handle{width:42px;height:5px;border-radius:8px;background:#ddd;margin:0 auto 13px}
@@ -116,6 +131,12 @@ input,select{font-family:inherit}
  </div>
  <button class="locate-btn" onclick="locateMe()">◎</button>
  <div class="map-hint">حرّك الخريطة أو ابحث عن موقعك</div>
+ <div id="driverSearchOverlay" role="status" aria-live="polite">
+  <div class="search-car-ring"><div class="search-car">🚘</div></div>
+  <div id="driverSearchTitle">جاري البحث عن سائق...</div>
+  <p id="driverSearchDetail">نبحث عن سائق لقبول رحلتك</p>
+  <div id="driverSearchClock">00:00</div>
+ </div>
 
  <aside id="menu">
   <h2>FERRARI | فيراري</h2>
@@ -245,6 +266,7 @@ let startMarker=null,endMarker=null,ridesListener=null,driverListener=null,activ
 let searchResults={pickup:[],destination:[]},selectedCar='standard';
 let estimatedDistance=null,estimatedPrice=null,mapSelectionMode=null;
 let searchTimers={pickup:null,destination:null};
+let searchStartedAt=null,searchTimerInterval=null;
 
 firebase.initializeApp(firebaseConfig);
 auth=firebase.auth();db=firebase.firestore();
@@ -484,6 +506,26 @@ function showHomeForRole(){
  }
 }
 
+function showDriverSearch(title,detail,accepted=false){
+ const box=el('driverSearchOverlay');
+ if(!box)return;
+ box.classList.add('visible');box.classList.toggle('accepted',accepted);
+ el('driverSearchTitle').textContent=title;
+ el('driverSearchDetail').textContent=detail||'';
+ if(accepted&&searchTimerInterval){clearInterval(searchTimerInterval);searchTimerInterval=null;}
+}
+function hideDriverSearch(){
+ const box=el('driverSearchOverlay');if(box)box.classList.remove('visible','accepted');
+ if(searchTimerInterval){clearInterval(searchTimerInterval);searchTimerInterval=null;}
+ searchStartedAt=null;
+}
+function startDriverSearchTimer(){
+ if(searchTimerInterval)clearInterval(searchTimerInterval);
+ searchStartedAt=Date.now();
+ const tick=()=>{if(!searchStartedAt)return;const seconds=Math.floor((Date.now()-searchStartedAt)/1000);const mm=String(Math.floor(seconds/60)).padStart(2,'0');const ss=String(seconds%60).padStart(2,'0');el('driverSearchClock').textContent=mm+':'+ss;};
+ tick();searchTimerInterval=setInterval(tick,1000);
+}
+
 /* طلب الرحلة */
 async function requestRide(){
  if(!user){showLogin('login');return}
@@ -501,24 +543,27 @@ async function requestRide(){
    createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
   el('rideSearchStatus').textContent='🔎 جاري البحث عن سائق لقبول رحلتك...';
+  showDriverSearch('جاري البحث عن سائق...','نبحث عن سائق قريب لقبول رحلتك');
+  startDriverSearchTimer();
   if(currentRideListener)currentRideListener();
   currentRideListener=rideRef.onSnapshot(snapshot=>{
    if(!snapshot.exists){el('rideSearchStatus').textContent='تعذر العثور على بيانات الطلب.';return;}
    const ride=snapshot.data();
    if(ride.status==='pending'){
     el('rideSearchStatus').textContent='🔎 جاري البحث عن سائق... طلبك وصل إلى السائقين المعتمدين.';
+    showDriverSearch('جاري البحث عن سائق...','طلبك وصل إلى السائقين المعتمدين');
    }else if(ride.status==='accepted'){
-    el('rideSearchStatus').textContent='✅ تم العثور على سائق وقبول رحلتك.'+
-     (ride.driverName?' السائق: '+ride.driverName+'.':'')+
-     (ride.vehicleType?' السيارة: '+ride.vehicleType+'.':'')+
-     (ride.driverPhone?' بيانات التواصل: '+ride.driverPhone+'.':'');
+    const acceptedDetail='تم قبول الرحلة'+(ride.driverName?' — السائق: '+ride.driverName:'')+(ride.vehicleType?' — السيارة: '+ride.vehicleType:'');
+    el('rideSearchStatus').textContent='✅ '+acceptedDetail+(ride.driverPhone?' — التواصل: '+ride.driverPhone:'');
+    showDriverSearch('تم العثور على سائق ✓',acceptedDetail,true);
    }else if(ride.status==='completed'){
     el('rideSearchStatus').textContent='🏁 اكتملت رحلتك. شكراً لاستخدام فيراري.';
+    hideDriverSearch();
    }
   },error=>{el('rideSearchStatus').textContent='تم إرسال الطلب، لكن تعذر تحديث حالة البحث: '+error.message;});
   message('status','تم إرسال طلبك بنجاح.');
   alert('تم إرسال طلب الرحلة بنجاح!\nالسعر التقريبي: '+estimatedPrice.toFixed(2)+' د.ل');
- }catch(e){message('status','تعذر إرسال الطلب: '+e.message);alert('تعذر إرسال الطلب: '+e.message)}
+ }catch(e){hideDriverSearch();message('status','تعذر إرسال الطلب: '+e.message);alert('تعذر إرسال الطلب: '+e.message)}
  finally{button.disabled=false;button.textContent='تأكيد طلب الرحلة'}
 }
 
@@ -718,6 +763,7 @@ async function logout(){
  if(driverListener){driverListener();driverListener=null}
  if(activeRidesListener){activeRidesListener();activeRidesListener=null}
  if(currentRideListener){currentRideListener();currentRideListener=null}
+ hideDriverSearch();
  try{
   await auth.signOut();profile=null;user=null;
   el('app').style.display='none';el('intro').style.display='block';
