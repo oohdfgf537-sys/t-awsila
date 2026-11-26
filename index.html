@@ -50,6 +50,10 @@ input,select{font-family:inherit}
 
 .map-hint{position:absolute;z-index:450;top:76px;right:50%;transform:translateX(50%);background:#fff;border-radius:25px;padding:9px 14px;box-shadow:0 3px 15px #0002;font-size:12px;white-space:nowrap;color:#555}
 .sheet{position:absolute;bottom:0;right:0;left:0;z-index:600;background:white;border-radius:25px 25px 0 0;padding:10px 17px calc(15px + env(safe-area-inset-bottom));box-shadow:0 -5px 25px #0002;max-height:78%;overflow-y:auto}
+/* بعد قبول الرحلة نعرض الخريطة كاملة ونخفي لوحة البحث والسيارات */
+#app.ride-accepted #customerSheet{display:none!important}
+#app.ride-accepted #mapHint{display:block}
+
 .handle{width:42px;height:5px;border-radius:8px;background:#ddd;margin:0 auto 13px}
 .sheet-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .sheet-heading h2{font-size:20px;margin:0}.sheet-heading p{font-size:12px;color:var(--muted);margin:5px 0 0}
@@ -528,12 +532,17 @@ function showHomeForRole(){
 function showDriverSearch(title,detail,accepted=false){
  const box=el('driverSearchOverlay');
  if(!box)return;
+ const app=el('app');
  if(accepted){
   hideDriverSearch();
+  if(app)app.classList.add('ride-accepted');
   const hint=el('mapHint');
   if(hint)hint.textContent='تم العثور على سائق ✓ — جارٍ عرض موقعه على الخريطة';
+  if(el('pickupResults'))el('pickupResults').innerHTML='';
+  if(el('destinationResults'))el('destinationResults').innerHTML='';
   return;
  }
+ if(app)app.classList.remove('ride-accepted');
  box.classList.add('visible');box.classList.remove('accepted');
  el('driverSearchTitle').textContent=title;
  el('driverSearchDetail').textContent=detail||'';
@@ -553,6 +562,7 @@ function startDriverSearchTimer(){
 /* طلب الرحلة */
 async function requestRide(){
  if(!user){showLogin('login');return}
+ el('app').classList.remove('ride-accepted');
  if(!start||!end){alert('حدد نقطة الانطلاق والوجهة أولاً');return}
  if(estimatedDistance===null||estimatedPrice===null){await calculateEstimate();if(estimatedDistance===null)return}
  const button=el('requestButton');
@@ -587,7 +597,7 @@ async function requestRide(){
     else el('rideSearchStatus').textContent+=' — بانتظار موقع السائق...';
    }else if(ride.status==='completed'){
     el('rideSearchStatus').textContent='🏁 اكتملت رحلتك. شكراً لاستخدام فيراري.';
-    stopDriverMapTracking();customerRidePickup=null;hideDriverSearch();
+    stopDriverMapTracking();customerRidePickup=null;hideDriverSearch();el('app').classList.remove('ride-accepted');
     const hint=el('mapHint');if(hint)hint.textContent='اكتملت الرحلة';
    }
   },error=>{el('rideSearchStatus').textContent='تم إرسال الطلب، لكن تعذر تحديث حالة البحث: '+error.message;});
