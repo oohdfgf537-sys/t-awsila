@@ -144,10 +144,26 @@ input,select{font-family:inherit}
  #map{inset:0}
  .panel{left:auto;width:440px;right:20px;top:20px;bottom:20px;border-radius:20px;box-shadow:0 5px 25px #0002}
 }
+
+#ferrariCompletion{display:none;position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.78);backdrop-filter:blur(7px);align-items:center;justify-content:center;padding:18px}
+#ferrariCompletion.visible{display:flex;animation:ferrariNoticeIn .35s ease-out}
+#ferrariCompletion .completion-card{width:min(420px,100%);border:1px solid #d6b45b;border-radius:26px;background:radial-gradient(circle at 50% 0%,#383020 0,#191919 48%,#101010 100%);color:#fff;text-align:center;padding:28px 22px 22px;box-shadow:0 24px 70px #000b;position:relative;overflow:hidden}
+#ferrariCompletion .completion-card:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#861919,#f0d58a,#861919)}
+#ferrariCompletion .completion-mark{width:76px;height:76px;margin:0 auto 14px;border-radius:50%;display:grid;place-items:center;border:2px solid #d8b85e;color:#f1d58a;font-size:38px;box-shadow:0 0 28px #d8b85e35}
+#ferrariCompletion h2{color:#f0d58a;font-size:24px;margin:8px 0}
+#ferrariCompletion .completion-sub{color:#ddd2b5;font-size:14px;margin:0 0 20px}
+#ferrariCompletion .completion-route{border-top:1px solid #ffffff20;border-bottom:1px solid #ffffff20;padding:13px 4px;margin:12px 0;text-align:right;font-size:13px;line-height:1.9;color:#f7f1e4}
+#ferrariCompletion .completion-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+#ferrariCompletion .completion-stat{background:#ffffff0c;border:1px solid #ffffff20;border-radius:14px;padding:12px 7px}
+#ferrariCompletion .completion-stat small{display:block;color:#cbbd99;font-size:12px;margin-bottom:5px}
+#ferrariCompletion .completion-stat strong{color:#f2d47d;font-size:21px}
+#ferrariCompletion button{width:100%;border:0;border-radius:14px;padding:14px;background:linear-gradient(135deg,#f1d889,#b68a32);color:#17130a;font-weight:900;font-size:15px;margin-top:8px}
+
 </style>
 </head>
 <body>
 <div id="ferrariNotice" role="status" aria-live="assertive"></div>
+<div id="ferrariCompletion" role="dialog" aria-modal="true" aria-labelledby="completionTitle"><div class="completion-card"><div class="completion-mark">✓</div><div style="color:#d7b65c;font-size:11px;letter-spacing:3px;font-weight:900">FERRARI EXPERIENCE</div><h2 id="completionTitle">اكتملت رحلتك بنجاح</h2><p class="completion-sub">شكراً لاختيارك فيراري</p><div id="completionDetails"></div><button type="button" onclick="closeCompletionExperience()">العودة إلى الخريطة</button></div></div>
 <section id="intro">
  <img id="intro-art" src="ferrari-cover.png" alt="فيراري">
  <button id="login-hit" class="intro-hit" onclick="showLogin('login')"></button>
@@ -586,6 +602,17 @@ function startDriverSearchTimer(){
  tick();searchTimerInterval=setInterval(tick,1000);
 }
 
+let completionShownRideIds=new Set();
+function closeCompletionExperience(){const modal=el('ferrariCompletion');if(modal)modal.classList.remove('visible');}
+function showCompletionExperience(ride,rideId,role){
+ if(rideId&&completionShownRideIds.has(rideId))return;
+ if(rideId)completionShownRideIds.add(rideId);
+ const modal=el('ferrariCompletion'),details=el('completionDetails');if(!modal||!details)return;
+ const price=Number(ride.price||0),distance=Number(ride.distance||0);
+ details.innerHTML='<div class="completion-route"><div>📍 <b>من:</b> '+escapeHtml(ride.pickupName||ride.pickup||'نقطة الانطلاق')+'</div><div>🏁 <b>إلى:</b> '+escapeHtml(ride.destinationName||ride.destination||'الوجهة')+'</div>'+(role==='driver'&&ride.customerName?'<div>👤 <b>الراكب:</b> '+escapeHtml(ride.customerName)+'</div>':'')+(role==='passenger'&&ride.driverName?'<div>🚘 <b>السائق:</b> '+escapeHtml(ride.driverName)+'</div>':'')+'</div><div class="completion-stats"><div class="completion-stat"><small>السعر النهائي</small><strong>'+price.toFixed(2)+' د.ل</strong></div><div class="completion-stat"><small>المسافة</small><strong>'+distance.toFixed(2)+' كم</strong></div></div><p class="completion-sub">'+(role==='driver'?'أحسنت! نتمنى لك رحلات آمنة ومميزة.':'نتمنى أن تكون رحلتك مريحة ومميزة.')+'</p>';
+ modal.classList.add('visible');
+}
+
 /* طلب الرحلة */
 async function requestRide(){
  if(!user){showLogin('login');return}
@@ -625,6 +652,7 @@ async function requestRide(){
     if(ride.driverLocation)updateCustomerDriverLocation(ride.driverLocation);
     else el('rideSearchStatus').textContent+=' — بانتظار موقع السائق...';
    }else if(ride.status==='completed'){
+    showCompletionExperience(ride,rideRef.id,'passenger');
     el('rideSearchStatus').textContent='🏁 اكتملت رحلتك. شكراً لاستخدام فيراري.';
     stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;el('liveRouteInfo').classList.remove('visible');hideDriverSearch();hidePassengerDriverCard();el('app').classList.remove('ride-accepted');
     const hint=el('mapHint');if(hint)hint.textContent='اكتملت الرحلة';
@@ -1036,6 +1064,7 @@ async function completeRide(rideId){
    alert('لا يمكن إنهاء هذه الرحلة. تحقق من أنها مقبولة باسمك.');return;
   }
   await ref.update({status:'completed'});
+  showCompletionExperience(snap.data(),rideId,'driver');
   stopDriverLocationSharing();
   if(passengerLiveMarker&&map){map.removeLayer(passengerLiveMarker);passengerLiveMarker=null;}
   alert('تم إنهاء الرحلة بنجاح.');
