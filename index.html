@@ -113,6 +113,9 @@ input,select{font-family:inherit}
 #driverRideAlert button.secondary{background:#eee;color:#333}
 .driver-map-car{font-size:34px;text-shadow:0 2px 5px #0004}
 .driver-live-info{background:#fff;border:1px solid #f2cddd;border-radius:12px;padding:10px;margin:10px 0;color:#333;font-size:13px;line-height:1.6}
+#liveRouteInfo{display:none;position:absolute;z-index:560;top:132px;right:14px;left:14px;max-width:460px;margin:auto;background:rgba(255,255,255,.96);border:1px solid #f2cddd;border-radius:14px;padding:11px 14px;box-shadow:0 3px 15px #0002;text-align:center;color:#29252a;font-size:13px;line-height:1.7}
+#liveRouteInfo.visible{display:block}
+#liveRouteInfo b{color:#1687e8}
 .hidden{display:none!important}
 .auth-switch{display:flex;gap:8px;margin:12px 0}
 .auth-switch button{flex:1;padding:12px;border-radius:10px;background:#fff0f6;color:#333}
@@ -144,6 +147,7 @@ input,select{font-family:inherit}
  </div>
  <button class="locate-btn" onclick="locateMe()">◎</button>
  <div class="map-hint" id="mapHint">حرّك الخريطة أو ابحث عن موقعك</div>
+ <div id="liveRouteInfo" aria-live="polite"></div>
  <div id="driverSearchOverlay" role="status" aria-live="polite">
   <div class="search-car-ring"><div class="search-car">🚘</div></div>
   <div id="driverSearchTitle">جاري البحث عن سائق...</div>
@@ -288,7 +292,7 @@ let searchResults={pickup:[],destination:[]},selectedCar='standard';
 let estimatedDistance=null,estimatedPrice=null,mapSelectionMode=null;
 let searchTimers={pickup:null,destination:null};
 let searchStartedAt=null,searchTimerInterval=null;
-let driverLocationWatchId=null,driverTrackingRideId=null,passengerLocationWatchId=null,passengerTrackingRideId=null,driverLiveMarker=null,driverLiveRoute=null,passengerLiveMarker=null,customerLiveMarker=null;
+let driverLocationWatchId=null,driverTrackingRideId=null,passengerLocationWatchId=null,passengerTrackingRideId=null,driverLiveMarker=null,driverLiveRoute=null,passengerLiveMarker=null,customerLiveMarker=null,passengerLiveRoute=null,driverSelfMarker=null,driverCurrentPoint=null,passengerCurrentPoint=null,driverRouteFetchAt=0;
 let customerRidePickup=null,lastEtaFetchAt=0,lastEtaPoint=null,pendingRideIds=new Set(),pendingFirstSnapshot=true;
 let activeDriverAlertRideId=null,driverAudioContext=null,driverAudioReady=false;
 
@@ -599,7 +603,7 @@ async function requestRide(){
     else el('rideSearchStatus').textContent+=' — بانتظار موقع السائق...';
    }else if(ride.status==='completed'){
     el('rideSearchStatus').textContent='🏁 اكتملت رحلتك. شكراً لاستخدام فيراري.';
-    stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;hideDriverSearch();el('app').classList.remove('ride-accepted');
+    stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;el('liveRouteInfo').classList.remove('visible');hideDriverSearch();el('app').classList.remove('ride-accepted');
     const hint=el('mapHint');if(hint)hint.textContent='اكتملت الرحلة';
    }
   },error=>{el('rideSearchStatus').textContent='تم إرسال الطلب، لكن تعذر تحديث حالة البحث: '+error.message;});
@@ -680,7 +684,11 @@ function startDriverLocationSharing(rideId){
   if(!user||driverTrackingRideId!==rideId)return;
   const latitude=pos.coords.latitude,longitude=pos.coords.longitude;
   try{
+   driverCurrentPoint=L.latLng(latitude,longitude);
+   const selfIcon=L.divIcon({className:'',html:'<div class="driver-map-car">🚘</div>',iconSize:[42,42],iconAnchor:[21,21]});
+   if(!driverSelfMarker)driverSelfMarker=L.marker(driverCurrentPoint,{icon:selfIcon,zIndexOffset:1050}).addTo(map).bindPopup('موقعك كسائق');else driverSelfMarker.setLatLng(driverCurrentPoint);
    await db.collection('rides').doc(rideId).update({driverLocation:{lat:latitude,lng:longitude,accuracy:pos.coords.accuracy||0,updatedAt:Date.now()}});
+   if(passengerCurrentPoint)calculatePassengerRoute(driverCurrentPoint,passengerCurrentPoint);
   }catch(e){console.warn('تعذر تحديث موقع السائق:',e);message('driverStatus','تعذر تحديث الموقع: '+e.message)}
  },err=>{message('driverStatus','تعذر الوصول إلى موقعك. اسمح للموقع من إعدادات المتصفح ثم أعد فتح التطبيق.');console.warn(err)},
  {enableHighAccuracy:true,maximumAge:5000,timeout:20000});
@@ -717,6 +725,26 @@ function updateDriverPassengerLocation(loc){
  const icon=L.divIcon({className:'',html:'<div style="font-size:30px;text-shadow:0 2px 5px #0005">📍</div>',iconSize:[38,38],iconAnchor:[19,19]});
  if(!passengerLiveMarker){passengerLiveMarker=L.marker(point,{icon,zIndexOffset:1100}).addTo(map).bindPopup('موقع الراكب المباشر');map.setView(point,15)}
  else passengerLiveMarker.setLatLng(point);
+ if(driverCurrentPoint)calculatePassengerRoute(driverCurrentPoint,point);
+}
+async function calculatePassengerRoute(driverPoint,passengerPoint){
+ const now=Date.now();if(now-driverRouteFetchAt<12000)return;driverRouteFetchAt=now;
+ try{
+  const url='https://router.project-osrm.org/route/v1/driving/'+driverPoint.lng+','+driverPoint.lat+';'+passengerPoint.lng+','+passengerPoint.lat+'?overview=full&geometries=geojson';
+  const response=await fetch(url);if(!response.ok)throw new Error('route unavailable');
+  const data=await response.json();if(!data.routes||!data.routes.length)throw new Error('no route');
+  const r=data.routes[0],minutes=Math.max(1,Math.ceil(r.duration/60));
+  const firstRoute=!passengerLiveRoute;
+  if(passengerLiveRoute)map.removeLayer(passengerLiveRoute);
+  passengerLiveRoute=L.geoJSON(r.geometry,{style:{color:'#ed1675',weight:6,opacity:.9}}).addTo(map);
+  if(firstRoute)map.fitBounds(passengerLiveRoute.getBounds(),{padding:[55,55],maxZoom:15});
+  el('liveRouteInfo').innerHTML='🧭 <b>المسار إلى الراكب</b><br>الوقت التقريبي لوصول السائق: <b>'+minutes+' دقيقة</b> — المسافة: '+(r.distance/1000).toFixed(1)+' كم';
+  el('liveRouteInfo').classList.add('visible');
+ }catch(e){
+  const km=driverPoint.distanceTo(passengerPoint)/1000,minutes=Math.max(1,Math.ceil(km/25*60));
+  el('liveRouteInfo').innerHTML='🧭 المسار المباشر إلى الراكب<br>الوقت التقريبي: <b>'+minutes+' دقيقة تقريباً</b> — المسافة بخط مستقيم: '+km.toFixed(1)+' كم';
+  el('liveRouteInfo').classList.add('visible');
+ }
 }
 function showLiveMap(){
  closePanels();toggleMenu(false);
@@ -726,7 +754,10 @@ function showLiveMap(){
 function stopDriverMapTracking(){
  if(driverLiveMarker&&map){map.removeLayer(driverLiveMarker);driverLiveMarker=null}
  if(driverLiveRoute&&map){map.removeLayer(driverLiveRoute);driverLiveRoute=null}
- lastEtaPoint=null;lastEtaFetchAt=0;
+ if(passengerLiveRoute&&map){map.removeLayer(passengerLiveRoute);passengerLiveRoute=null}
+ if(driverSelfMarker&&map){map.removeLayer(driverSelfMarker);driverSelfMarker=null}
+ driverCurrentPoint=null;passengerCurrentPoint=null;driverRouteFetchAt=0;
+ el('liveRouteInfo').classList.remove('visible');lastEtaPoint=null;lastEtaFetchAt=0;
 }
 function updateCustomerDriverLocation(loc){
  if(!map||!loc)return;
@@ -760,11 +791,13 @@ async function calculateDriverEta(driverPoint,pickupPoint){
   if(driverLiveRoute)map.removeLayer(driverLiveRoute);
   driverLiveRoute=L.geoJSON(r.geometry,{style:{color:'#1687e8',weight:5,opacity:.9,dashArray:'8 7'}}).addTo(map);
   if(firstRoute)map.fitBounds(driverLiveRoute.getBounds(),{padding:[55,55],maxZoom:15});
-  el('rideSearchStatus').textContent='🚘 السائق يقترب — الوقت التقريبي للوصول: '+minutes+' دقيقة ('+(r.distance/1000).toFixed(1)+' كم بالطريق).';
+  const etaText='🚘 السائق يقترب — الوقت التقريبي للوصول: '+minutes+' دقيقة ('+(r.distance/1000).toFixed(1)+' كم بالطريق).';
+  el('rideSearchStatus').textContent=etaText;el('liveRouteInfo').innerHTML='🧭 <b>مسار السائق إلى موقعك</b><br>'+etaText;el('liveRouteInfo').classList.add('visible');
  }catch(e){
   const km=driverPoint.distanceTo(L.latLng(pickupPoint.lat,pickupPoint.lng))/1000;
   const minutes=Math.max(1,Math.ceil(km/25*60));
-  el('rideSearchStatus').textContent='🚘 موقع السائق مباشر — الوقت التقريبي للوصول: '+minutes+' دقيقة تقريباً.';
+  const etaText='🚘 موقع السائق مباشر — الوقت التقريبي للوصول: '+minutes+' دقيقة تقريباً.';
+  el('rideSearchStatus').textContent=etaText;el('liveRouteInfo').innerHTML='🧭 <b>مسار السائق إلى موقعك</b><br>'+etaText;el('liveRouteInfo').classList.add('visible');
  }
 }
 
