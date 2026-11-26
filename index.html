@@ -107,7 +107,7 @@ input,select{font-family:inherit}
 .msg{color:var(--pink);font-size:13px;overflow-wrap:anywhere;line-height:1.6}
 .card{background:#fff5f9;border:1px solid #f3d5e3;border-radius:14px;padding:13px;margin:10px 0}
 .card p{margin:6px 0;font-size:14px;line-height:1.6}
-.small-btn{padding:10px 14px;background:var(--pink);color:white;border-radius:10px;margin-top:8px}
+.small-btn{padding:10px 14px;background:var(--pink);color:white;border-radius:10px;margin-top:8px}.cancel-btn{padding:10px 14px;background:#b42318;color:white;border-radius:10px;margin:8px 0 0 6px;font-weight:bold}.ride-price{display:block;background:#fff;border:1px solid #f2cddd;border-radius:10px;padding:9px 12px;margin:9px 0;color:var(--pink);font-size:18px;font-weight:bold}
 .btn{width:100%;background:linear-gradient(90deg,#f52b88,#d91669);color:white;border-radius:13px;padding:15px;margin-top:12px;font-size:16px;font-weight:bold}
 #driverRideAlert{display:none;position:absolute;z-index:1100;top:78px;left:50%;transform:translateX(-50%);width:min(360px,92vw);background:#fff;border:2px solid var(--pink);border-radius:18px;padding:14px;box-shadow:0 8px 30px #0003;text-align:right}
 #driverRideAlert.visible{display:block;animation:searchPop .25s ease-out}
@@ -606,10 +606,15 @@ async function requestRide(){
     customerRidePickup=parts.length===2&&parts.every(Number.isFinite)?{lat:parts[0],lng:parts[1]}:null;
     if(ride.driverLocation)updateCustomerDriverLocation(ride.driverLocation);
     else el('rideSearchStatus').textContent+=' — بانتظار موقع السائق...';
+    showPassengerCancelButton(rideRef.id);
    }else if(ride.status==='completed'){
     el('rideSearchStatus').textContent='🏁 اكتملت رحلتك. شكراً لاستخدام فيراري.';
     stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;el('liveRouteInfo').classList.remove('visible');hideDriverSearch();el('app').classList.remove('ride-accepted');
     const hint=el('mapHint');if(hint)hint.textContent='اكتملت الرحلة';
+   }else if(ride.status==='cancelled'){
+    el('rideSearchStatus').textContent='تم إلغاء الرحلة.';
+    stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;el('liveRouteInfo').classList.remove('visible');hideDriverSearch();el('app').classList.remove('ride-accepted');
+    const hint=el('mapHint');if(hint)hint.textContent='تم إلغاء الرحلة';
    }
   },error=>{el('rideSearchStatus').textContent='تم إرسال الطلب، لكن تعذر تحديث حالة البحث: '+error.message;});
   message('status','تم إرسال طلبك بنجاح.');
@@ -638,10 +643,24 @@ function showMyRides(){
     '<p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>'+
     (r.driverName?'<p><b>السائق:</b> '+escapeHtml(r.driverName)+'</p>':'')+
     (r.vehicleType?'<p><b>السيارة:</b> '+escapeHtml(r.vehicleType)+'</p>':'')+
-    (r.driverPhone?'<p><b>وسيلة التواصل:</b> '+escapeHtml(r.driverPhone)+'</p>':'');
+    (r.driverPhone?'<p><b>وسيلة التواصل:</b> '+escapeHtml(r.driverPhone)+'</p>':'')+
+    (r.status==='accepted'?'<button class="cancel-btn" type="button">إلغاء الرحلة</button>':'');
+   if(r.status==='accepted')card.querySelector('button.cancel-btn').addEventListener('click',()=>cancelRide(doc.id));
    list.appendChild(card);
   });
  },e=>list.textContent='تعذر تحميل الرحلات: '+e.message);
+}
+
+function showPassengerCancelButton(rideId){
+ const status=el('rideSearchStatus');
+ if(!status)return;
+ let button=status.querySelector('#passengerCancelRideButton');
+ if(!button){
+  button=document.createElement('button');
+  button.id='passengerCancelRideButton';button.type='button';button.className='cancel-btn';button.textContent='إلغاء الرحلة';
+  status.appendChild(document.createTextNode(' '));status.appendChild(button);
+ }
+ button.onclick=()=>cancelRide(rideId);
 }
 
 /* تنبيهات الرحلات ومشاركة الموقع المباشر */
@@ -893,11 +912,13 @@ function loadActiveRides(){
      '<p><b>إلى:</b> '+escapeHtml(r.destinationName||r.destination||'')+'</p>'+
      '<p><b>نوع السيارة:</b> '+escapeHtml(r.carName||r.vehicleType||'اقتصادية')+'</p>'+
      '<p><b>المسافة:</b> '+Number(r.distance||0).toFixed(2)+' كم</p>'+
-     '<p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>'+
+     '<div class="ride-price">💰 سعر الرحلة: '+Number(r.price||0).toFixed(2)+' د.ل</div>'+
      '<p><b>الحالة:</b> قيد التنفيذ</p>'+
      '<button class="small-btn" type="button" onclick="showLiveMap()">عرض موقع الراكب على الخريطة</button> '+
-     '<button class="small-btn" type="button">إنهاء الرحلة</button>';
+     '<button class="small-btn" type="button">إنهاء الرحلة</button> '+
+     '<button class="cancel-btn" type="button">إلغاء الرحلة</button>';
     card.querySelectorAll('button')[1].addEventListener('click',()=>completeRide(doc.id));
+    card.querySelectorAll('button')[2].addEventListener('click',()=>cancelRide(doc.id));
     box.appendChild(card);
    });
   },e=>box.textContent='تعذر تحميل الرحلات المقبولة: '+e.message);
@@ -935,6 +956,29 @@ function loadActiveRides(){
   stopCompleted();
  };
 }
+async function cancelRide(rideId){
+ if(!user){alert('سجّل الدخول أولاً');return}
+ if(!confirm('هل أنت متأكد من إلغاء الرحلة المقبولة؟'))return;
+ try{
+  const ref=db.collection('rides').doc(rideId),snap=await ref.get();
+  if(!snap.exists){alert('الرحلة غير موجودة.');return}
+  const ride=snap.data();
+  const isCustomer=ride.customerId===user.uid;
+  const isAssignedDriver=profile&&profile.role==='driver'&&profile.approved===true&&ride.driverId===user.uid;
+  if(ride.status!=='accepted'||(!isCustomer&&!isAssignedDriver)){
+   alert('لا يمكنك إلغاء هذه الرحلة أو أنها لم تعد نشطة.');return;
+  }
+  await ref.update({status:'cancelled'});
+  stopDriverLocationSharing();stopPassengerLocationSharing();stopDriverMapTracking();
+  if(passengerLiveMarker&&map){map.removeLayer(passengerLiveMarker);passengerLiveMarker=null;}
+  if(driverSelfMarker&&map){map.removeLayer(driverSelfMarker);driverSelfMarker=null;}
+  customerRidePickup=null;
+  if(el('liveRouteInfo'))el('liveRouteInfo').classList.remove('visible');
+  hideDriverSearch();el('app').classList.remove('ride-accepted');
+  alert('تم إلغاء الرحلة بنجاح.');
+ }catch(e){alert('تعذر إلغاء الرحلة: '+(e.code||'')+' — '+e.message)}
+}
+
 async function completeRide(rideId){
  if(!user||!profile||profile.role!=='driver'||profile.approved!==true){alert('حساب السائق غير معتمد');return}
  if(!confirm('هل أنت متأكد من إنهاء هذه الرحلة؟'))return;
