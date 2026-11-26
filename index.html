@@ -214,7 +214,7 @@ input,select{font-family:inherit}
  <label>اسم السائق</label><input id="driverName" placeholder="اكتب اسمك">
  <label>نوع السيارة</label><input id="vehicleType" placeholder="مثال: هيونداي إلنترا">
  <button class="btn" onclick="saveDriverInfo()">حفظ بياناتي</button>
- <h3>الرحلات المتاحة</h3><div id="pendingRides"><p>جارٍ تحميل الرحلات...</p></div>
+ <h3>رحلاتي المقبولة</h3><div id="activeRides"><p>جارٍ تحميل الرحلات المقبولة...</p></div><h3>الرحلات المتاحة</h3><div id="pendingRides"><p>جارٍ تحميل الرحلات...</p></div>
 </section>
 <section id="driverApplication" class="panel">
  <div class="panel-head"><button class="circle" onclick="closePanels()">←</button><h2>التسجيل كسائق</h2></div>
@@ -240,7 +240,7 @@ const firebaseConfig={
 };
 let auth=null,db=null,user=null,profile=null;
 let authMode='login',map=null,start=null,end=null,route=null,userMarker=null;
-let startMarker=null,endMarker=null,ridesListener=null,driverListener=null;
+let startMarker=null,endMarker=null,ridesListener=null,driverListener=null,activeRidesListener=null;
 let searchResults={pickup:[],destination:[]},selectedCar='standard';
 let estimatedDistance=null,estimatedPrice=null,mapSelectionMode=null;
 let searchTimers={pickup:null,destination:null};
@@ -517,7 +517,7 @@ function showMyRides(){
   snapshot.forEach(doc=>{
    const r=doc.data(),card=document.createElement('div');card.className='card';
    card.innerHTML=
-    '<p><b>الحالة:</b> '+escapeHtml(r.status==='accepted'?'تم قبول الرحلة':'بانتظار سائق')+'</p>'+
+    '<p><b>الحالة:</b> '+escapeHtml(r.status==='completed'?'مكتملة':r.status==='accepted'?'تم قبول الرحلة':r.status==='pending'?'بانتظار سائق':r.status)+'</p>'+
     '<p><b>من:</b> '+escapeHtml(r.pickupName||r.pickup||'')+'</p>'+
     '<p><b>إلى:</b> '+escapeHtml(r.destinationName||r.destination||'')+'</p>'+
     '<p><b>السيارة:</b> '+escapeHtml(r.carName||'اقتصادية')+'</p>'+
@@ -539,7 +539,7 @@ function showDriverPanel(){
  el('driverPanel').style.display='block';
  el('driverName').value=localStorage.getItem('ferrariDriverName')||'';
  el('vehicleType').value=localStorage.getItem('ferrariVehicleType')||'';
- message('driverStatus','مرحباً بك في لوحة السائق المعتمد.');loadPendingRides();
+ message('driverStatus','مرحباً بك في لوحة السائق المعتمد.');loadPendingRides();loadActiveRides();
 }
 function saveDriverInfo(){
  const name=el('driverName').value.trim(),vehicle=el('vehicleType').value.trim();
@@ -566,6 +566,35 @@ function loadPendingRides(){
   });
  },e=>box.textContent='تعذر تحميل الرحلات: '+e.message);
 }
+function loadActiveRides(){
+ const box=el('activeRides');box.innerHTML='<p>جارٍ تحميل الرحلات المقبولة...</p>';
+ if(activeRidesListener)activeRidesListener();
+ activeRidesListener=db.collection('rides').where('driverId','==',user.uid).where('status','==','accepted').onSnapshot(snapshot=>{
+  box.innerHTML='';
+  if(snapshot.empty){box.innerHTML='<p>لا توجد رحلات مقبولة قيد التنفيذ حالياً.</p>';return}
+  snapshot.forEach(doc=>{
+   const r=doc.data(),card=document.createElement('div');card.className='card';
+   card.innerHTML='<p><b>من:</b> '+escapeHtml(r.pickupName||r.pickup||'')+'</p>'+
+    '<p><b>إلى:</b> '+escapeHtml(r.destinationName||r.destination||'')+'</p>'+
+    '<p><b>السعر:</b> '+Number(r.price||0).toFixed(2)+' د.ل</p>'+
+    '<button class="small-btn">إنهاء الرحلة</button>';
+   card.querySelector('button').addEventListener('click',()=>completeRide(doc.id));box.appendChild(card);
+  });
+ },e=>box.textContent='تعذر تحميل الرحلات المقبولة: '+e.message);
+}
+async function completeRide(rideId){
+ if(!user||!profile||profile.role!=='driver'||profile.approved!==true){alert('حساب السائق غير معتمد');return}
+ if(!confirm('هل أنت متأكد من إنهاء هذه الرحلة؟'))return;
+ try{
+  const ref=db.collection('rides').doc(rideId),snap=await ref.get();
+  if(!snap.exists||snap.data().driverId!==user.uid||snap.data().status!=='accepted'){
+   alert('لا يمكن إنهاء هذه الرحلة. تحقق من أنها مقبولة باسمك.');return;
+  }
+  await ref.update({status:'completed',completedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  alert('تم إنهاء الرحلة بنجاح.');
+ }catch(e){alert('تعذر إنهاء الرحلة: '+(e.code||'')+' — '+e.message)}
+}
+
 async function acceptRide(rideId){
  if(!user||!profile||profile.role!=='driver'||profile.approved!==true){alert('حساب السائق غير معتمد');return}
  const name=el('driverName').value.trim()||localStorage.getItem('ferrariDriverName')||'سائق فيراري';
@@ -607,6 +636,7 @@ async function logout(){
  toggleMenu(false);closePanels();
  if(ridesListener){ridesListener();ridesListener=null}
  if(driverListener){driverListener();driverListener=null}
+ if(activeRidesListener){activeRidesListener();activeRidesListener=null}
  try{
   await auth.signOut();profile=null;user=null;
   el('app').style.display='none';el('intro').style.display='block';
