@@ -158,12 +158,19 @@ input,select{font-family:inherit}
 #ferrariCompletion .completion-stat small{display:block;color:#817780;font-size:12px;margin-bottom:5px}
 #ferrariCompletion .completion-stat strong{color:var(--pink);font-size:21px}
 #ferrariCompletion button{width:100%;border:0;border-radius:14px;padding:14px;background:linear-gradient(135deg,#f52b88,#d91669);color:#fff;font-weight:900;font-size:15px;margin-top:8px}
+#completionRating{margin:14px 0 4px;padding:13px;background:#fff0f6;border:1px solid #f3d5e3;border-radius:16px}
+#completionRating h3{color:var(--pink);font-size:16px;margin:2px 0 6px}
+#completionRating .rating-stars{display:flex;justify-content:center;gap:8px;direction:ltr;margin:10px 0}
+#completionRating .rating-stars button{width:42px;height:42px;padding:0;margin:0;background:#fff;border:1px solid #f0bfd4;color:#d7a2b8;border-radius:12px;font-size:27px;box-shadow:none}
+#completionRating .rating-stars button.selected{background:#ffe1ed;color:#ed1675;border-color:#ed1675}
+#completionRating .rating-hint{font-size:12px;color:#88717d;margin:5px 0}
+#completionRating .rating-save{margin-top:8px}
 
 </style>
 </head>
 <body>
 <div id="ferrariNotice" role="status" aria-live="assertive"></div>
-<div id="ferrariCompletion" role="dialog" aria-modal="true" aria-labelledby="completionTitle"><div class="completion-card"><div class="completion-mark">✓</div><div style="color:#d7b65c;font-size:11px;letter-spacing:3px;font-weight:900">FERRARI EXPERIENCE</div><h2 id="completionTitle">اكتملت رحلتك بنجاح</h2><p class="completion-sub">شكراً لاختيارك فيراري</p><div id="completionDetails"></div><button type="button" onclick="closeCompletionExperience()">العودة إلى الخريطة</button></div></div>
+<div id="ferrariCompletion" role="dialog" aria-modal="true" aria-labelledby="completionTitle"><div class="completion-card"><div class="completion-mark">✓</div><div style="color:#ed1675;font-size:11px;letter-spacing:3px;font-weight:900">FERRARI EXPERIENCE</div><h2 id="completionTitle">اكتملت رحلتك بنجاح</h2><p class="completion-sub">شكراً لاختيارك فيراري</p><div id="completionDetails"></div><div id="completionRating"></div><button type="button" onclick="closeCompletionExperience()">العودة إلى الخريطة</button></div></div>
 <section id="intro">
  <img id="intro-art" src="ferrari-cover.png" alt="فيراري">
  <button id="login-hit" class="intro-hit" onclick="showLogin('login')"></button>
@@ -339,7 +346,7 @@ auth=firebase.auth();db=firebase.firestore();
 
 auth.onAuthStateChanged(async u=>{
  user=u;
- if(u){await loadProfile();el('accountInfo').textContent='الحساب: '+(u.email||'');}
+ if(u){await loadProfile();await updateAccountInfo();}
  else{profile=null;el('accountInfo').textContent='مرحباً بك';}
 });
 function el(id){return document.getElementById(id)}
@@ -562,7 +569,7 @@ async function loadProfile(){
    profile=snap.data();
    if(!profile.email){await ref.set({email:user.email||''},{merge:true});profile.email=user.email||''}
   }
-  el('accountInfo').textContent='الحساب: '+(user.email||'');
+  await updateAccountInfo();
  }catch(e){console.error('Profile error:',e);message('message','تعذر تحميل بيانات الحساب: '+e.message)}
 }
 function showHomeForRole(){
@@ -603,14 +610,49 @@ function startDriverSearchTimer(){
 }
 
 let completionShownRideIds=new Set();
+let selectedCompletionRating=0,completionRatingTargetUid='',completionRatingRideId='',completionRatingRole='',completionRatingTargetName='';
 function closeCompletionExperience(){const modal=el('ferrariCompletion');if(modal)modal.classList.remove('visible');}
-function showCompletionExperience(ride,rideId,role){
+async function showCompletionExperience(ride,rideId,role){
  if(rideId&&completionShownRideIds.has(rideId))return;
  if(rideId)completionShownRideIds.add(rideId);
  const modal=el('ferrariCompletion'),details=el('completionDetails');if(!modal||!details)return;
  const price=Number(ride.price||0),distance=Number(ride.distance||0);
  details.innerHTML='<div class="completion-route"><div>📍 <b>من:</b> '+escapeHtml(ride.pickupName||ride.pickup||'نقطة الانطلاق')+'</div><div>🏁 <b>إلى:</b> '+escapeHtml(ride.destinationName||ride.destination||'الوجهة')+'</div>'+(role==='driver'&&ride.customerName?'<div>👤 <b>الراكب:</b> '+escapeHtml(ride.customerName)+'</div>':'')+(role==='passenger'&&ride.driverName?'<div>🚘 <b>السائق:</b> '+escapeHtml(ride.driverName)+'</div>':'')+'</div><div class="completion-stats"><div class="completion-stat"><small>السعر النهائي</small><strong>'+price.toFixed(2)+' د.ل</strong></div><div class="completion-stat"><small>المسافة</small><strong>'+distance.toFixed(2)+' كم</strong></div></div><p class="completion-sub">'+(role==='driver'?'أحسنت! نتمنى لك رحلات آمنة ومميزة.':'نتمنى أن تكون رحلتك مريحة ومميزة.')+'</p>';
+ const ratingBox=el('completionRating');
+ completionRatingTargetUid=role==='driver'?(ride.customerId||''):(ride.driverId||'');
+ completionRatingTargetName=role==='driver'?(ride.customerName||'الراكب'):(ride.driverName||'السائق');
+ completionRatingRideId=rideId||'';completionRatingRole=role;selectedCompletionRating=0;
+ if(ratingBox){
+  ratingBox.innerHTML='<h3>⭐ قيّم '+escapeHtml(completionRatingTargetName)+'</h3><p class="rating-hint">رأيك يساعدنا على تحسين تجربة FERRARI</p><div class="rating-stars" id="completionRatingStars">'+[1,2,3,4,5].map(n=>'<button type="button" aria-label="'+n+' نجوم" onclick="selectCompletionRating('+n+')">★</button>').join('')+'</div><p class="rating-hint" id="completionRatingHint">اختر عدد النجوم</p><button class="rating-save" id="completionRatingSave" type="button" onclick="submitCompletionRating()">إرسال التقييم</button>';
+  if(!completionRatingTargetUid||!completionRatingRideId){ratingBox.innerHTML='<p class="rating-hint">تعذر تحديد الطرف الآخر للتقييم.</p>';}
+  else {
+   try{const prior=await db.collection('users').doc(completionRatingTargetUid).collection('ratings').doc(completionRatingRideId).get();if(prior.exists)ratingBox.innerHTML='<h3>شكراً لك ❤️</h3><p class="rating-hint">سبق أن أرسلت تقييمك لهذه الرحلة.</p>';}
+   catch(err){console.warn('تعذر التحقق من التقييم السابق:',err);}
+  }
+ }
  modal.classList.add('visible');
+}
+function selectCompletionRating(value){
+ selectedCompletionRating=Math.max(1,Math.min(5,Number(value)||0));
+ const stars=el('completionRatingStars');if(!stars)return;
+ stars.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('selected',i<selectedCompletionRating));
+ const hint=el('completionRatingHint');if(hint)hint.textContent=['','ضعيف','مقبول','جيد','جيد جداً','ممتاز'][selectedCompletionRating];
+}
+async function submitCompletionRating(){
+ if(!user||!completionRatingTargetUid||!completionRatingRideId||selectedCompletionRating<1){alert('اختر عدد النجوم أولاً.');return;}
+ const btn=el('completionRatingSave');if(btn)btn.disabled=true;
+ try{
+  const ref=db.collection('users').doc(completionRatingTargetUid).collection('ratings').doc(completionRatingRideId);
+  const existing=await ref.get();if(existing.exists){el('completionRating').innerHTML='<h3>شكراً لك ❤️</h3><p class="rating-hint">سبق أن أرسلت تقييمك لهذه الرحلة.</p>';return;}
+  await ref.set({rideId:completionRatingRideId,raterId:user.uid,ratedUserId:completionRatingTargetUid,stars:selectedCompletionRating,raterRole:completionRatingRole,raterName:profile?.driverName||profile?.name||user.email||'مستخدم FERRARI',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  el('completionRating').innerHTML='<h3>تم إرسال تقييمك بنجاح ❤️</h3><p class="rating-hint">شكراً لمساهمتك في تحسين FERRARI</p>';
+  updateAccountInfo();
+ }catch(e){alert('تعذر حفظ التقييم: '+(e.code||'')+' '+e.message);if(btn)btn.disabled=false;}
+}
+async function updateAccountInfo(){
+ if(!user||!db)return;
+ try{const snap=await db.collection('users').doc(user.uid).collection('ratings').get();let total=0,count=0;snap.forEach(d=>{const n=Number(d.data().stars);if(n>=1&&n<=5){total+=n;count++;}});el('accountInfo').textContent='الحساب: '+(user.email||'')+(count?'  •  ⭐ '+(total/count).toFixed(1)+' ('+count+' تقييم)':'  •  لا توجد تقييمات بعد');}
+ catch(e){el('accountInfo').textContent='الحساب: '+(user.email||'');console.warn('تعذر تحميل متوسط التقييم:',e);}
 }
 
 /* طلب الرحلة */
