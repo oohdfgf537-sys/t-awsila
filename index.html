@@ -339,6 +339,7 @@ let searchTimers={pickup:null,destination:null};
 let searchStartedAt=null,searchTimerInterval=null;
 let driverLocationWatchId=null,driverTrackingRideId=null,passengerLocationWatchId=null,passengerTrackingRideId=null,driverLiveMarker=null,driverLiveRoute=null,passengerLiveMarker=null,customerLiveMarker=null,passengerLiveRoute=null,driverSelfMarker=null,driverCurrentPoint=null,passengerCurrentPoint=null,driverRouteFetchAt=0;
 let customerRidePickup=null,lastEtaFetchAt=0,lastEtaPoint=null,pendingRideIds=new Set(),pendingFirstSnapshot=true;
+let customerCurrentRideId=null,passengerArrivalNotifiedRideId=null;
 let activeDriverAlertRideId=null,driverAudioContext=null,driverAudioReady=false;
 
 firebase.initializeApp(firebaseConfig);
@@ -691,16 +692,17 @@ async function requestRide(){
     startPassengerLocationSharing(rideRef.id);
     const parts=String(ride.pickup||'').split(',').map(Number);
     customerRidePickup=parts.length===2&&parts.every(Number.isFinite)?{lat:parts[0],lng:parts[1]}:null;
+    customerCurrentRideId=rideRef.id;
     if(ride.driverLocation)updateCustomerDriverLocation(ride.driverLocation);
     else el('rideSearchStatus').textContent+=' — بانتظار موقع السائق...';
    }else if(ride.status==='completed'){
     showCompletionExperience(ride,rideRef.id,'passenger');
     el('rideSearchStatus').textContent='🏁 اكتملت رحلتك. شكراً لاستخدام فيراري.';
-    stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;el('liveRouteInfo').classList.remove('visible');hideDriverSearch();hidePassengerDriverCard();el('app').classList.remove('ride-accepted');
+    stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;customerCurrentRideId=null;el('liveRouteInfo').classList.remove('visible');hideDriverSearch();hidePassengerDriverCard();el('app').classList.remove('ride-accepted');
     const hint=el('mapHint');if(hint)hint.textContent='اكتملت الرحلة';
    }else if(ride.status==='cancelled'){
     if(ride.cancelledBy&&ride.cancelledBy!==user.uid)showFerrariNotice('تم إلغاء الرحلة من السائق','يمكنك طلب رحلة جديدة عند الرغبة.');
-    el('rideSearchStatus').textContent='تم إلغاء الرحلة.';stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;hideDriverSearch();hidePassengerDriverCard();el('liveRouteInfo').classList.remove('visible');el('app').classList.remove('ride-accepted');
+    el('rideSearchStatus').textContent='تم إلغاء الرحلة.';stopDriverMapTracking();stopPassengerLocationSharing();customerRidePickup=null;customerCurrentRideId=null;hideDriverSearch();hidePassengerDriverCard();el('liveRouteInfo').classList.remove('visible');el('app').classList.remove('ride-accepted');
    }
   },error=>{el('rideSearchStatus').textContent='تم إرسال الطلب، لكن تعذر تحديث حالة البحث: '+error.message;});
   message('status','تم إرسال طلبك بنجاح.');
@@ -894,6 +896,20 @@ function updateCustomerDriverLocation(loc){
  const icon=L.divIcon({className:'',html:'<div class="driver-map-car">🚘</div>',iconSize:[42,42],iconAnchor:[21,21]});
  if(!driverLiveMarker){driverLiveMarker=L.marker(point,{icon,zIndexOffset:1000}).addTo(map).bindPopup('موقع السائق المباشر');map.setView(point,15)}
  else driverLiveMarker.setLatLng(point);
+ // إشعار الراكب مرة واحدة عندما يدخل السائق نطاق 100 متر من نقطة الالتقاء
+ if(customerRidePickup&&customerCurrentRideId){
+  const arrivalKey='ferrari-arrival-'+customerCurrentRideId;
+  let alreadyNotified=passengerArrivalNotifiedRideId===customerCurrentRideId;
+  try{alreadyNotified=alreadyNotified||localStorage.getItem(arrivalKey)==='1'}catch(e){}
+  const meters=point.distanceTo(L.latLng(customerRidePickup.lat,customerRidePickup.lng));
+  if(meters<=100&&!alreadyNotified){
+   passengerArrivalNotifiedRideId=customerCurrentRideId;
+   try{localStorage.setItem(arrivalKey,'1')}catch(e){}
+   showFerrariNotice('وصل السائق إلى موقعك','السائق قريب من نقطة الالتقاء. يمكنك التوجه إليه الآن.');
+   playDriverAlertSound();
+   el('rideSearchStatus').textContent='📍 وصل السائق إلى موقعك. يمكنك التوجه إليه الآن.';
+  }
+ }
  const now=Date.now();
  if(customerRidePickup&&(!lastEtaPoint||point.distanceTo(lastEtaPoint)>120||now-lastEtaFetchAt>20000)){
   lastEtaPoint=point;lastEtaFetchAt=now;calculateDriverEta(point,customerRidePickup);
