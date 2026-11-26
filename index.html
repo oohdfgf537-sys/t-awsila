@@ -184,6 +184,7 @@ input,select{font-family:inherit}
   </div>
   <button class="request" id="requestButton" onclick="requestRide()">احسب السعر أولاً</button>
   <p class="note" id="status">حدد موقع الانطلاق والوجهة لعرض السعر والمسافة</p>
+  <p class="msg" id="rideSearchStatus" aria-live="polite"></p>
  </div>
 </section>
 
@@ -240,7 +241,7 @@ const firebaseConfig={
 };
 let auth=null,db=null,user=null,profile=null;
 let authMode='login',map=null,start=null,end=null,route=null,userMarker=null;
-let startMarker=null,endMarker=null,ridesListener=null,driverListener=null,activeRidesListener=null;
+let startMarker=null,endMarker=null,ridesListener=null,driverListener=null,activeRidesListener=null,currentRideListener=null;
 let searchResults={pickup:[],destination:[]},selectedCar='standard';
 let estimatedDistance=null,estimatedPrice=null,mapSelectionMode=null;
 let searchTimers={pickup:null,destination:null};
@@ -491,7 +492,7 @@ async function requestRide(){
  const button=el('requestButton');
  try{
   button.disabled=true;button.textContent='جارٍ إرسال طلبك...';message('status','جارٍ إرسال طلب الرحلة...');
-  await db.collection('rides').add({
+  const rideRef=await db.collection('rides').add({
    customerId:user.uid,customerEmail:user.email||'',service:'car',carType:selectedCar,carName:carName(),
    pickup:start.lat+','+start.lng,destination:end.lat+','+end.lng,
    pickupName:window.pickupName||el('pickupSearch').value||'نقطة الانطلاق',
@@ -499,7 +500,23 @@ async function requestRide(){
    distance:estimatedDistance,price:estimatedPrice,status:'pending',
    createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
-  message('status','تم إرسال طلبك بنجاح. نبحث عن سائق قريب منك.');
+  el('rideSearchStatus').textContent='🔎 جاري البحث عن سائق لقبول رحلتك...';
+  if(currentRideListener)currentRideListener();
+  currentRideListener=rideRef.onSnapshot(snapshot=>{
+   if(!snapshot.exists){el('rideSearchStatus').textContent='تعذر العثور على بيانات الطلب.';return;}
+   const ride=snapshot.data();
+   if(ride.status==='pending'){
+    el('rideSearchStatus').textContent='🔎 جاري البحث عن سائق... طلبك وصل إلى السائقين المعتمدين.';
+   }else if(ride.status==='accepted'){
+    el('rideSearchStatus').textContent='✅ تم العثور على سائق وقبول رحلتك.'+
+     (ride.driverName?' السائق: '+ride.driverName+'.':'')+
+     (ride.vehicleType?' السيارة: '+ride.vehicleType+'.':'')+
+     (ride.driverPhone?' بيانات التواصل: '+ride.driverPhone+'.':'');
+   }else if(ride.status==='completed'){
+    el('rideSearchStatus').textContent='🏁 اكتملت رحلتك. شكراً لاستخدام فيراري.';
+   }
+  },error=>{el('rideSearchStatus').textContent='تم إرسال الطلب، لكن تعذر تحديث حالة البحث: '+error.message;});
+  message('status','تم إرسال طلبك بنجاح.');
   alert('تم إرسال طلب الرحلة بنجاح!\nالسعر التقريبي: '+estimatedPrice.toFixed(2)+' د.ل');
  }catch(e){message('status','تعذر إرسال الطلب: '+e.message);alert('تعذر إرسال الطلب: '+e.message)}
  finally{button.disabled=false;button.textContent='تأكيد طلب الرحلة'}
@@ -700,6 +717,7 @@ async function logout(){
  if(ridesListener){ridesListener();ridesListener=null}
  if(driverListener){driverListener();driverListener=null}
  if(activeRidesListener){activeRidesListener();activeRidesListener=null}
+ if(currentRideListener){currentRideListener();currentRideListener=null}
  try{
   await auth.signOut();profile=null;user=null;
   el('app').style.display='none';el('intro').style.display='block';
