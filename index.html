@@ -382,7 +382,60 @@ let activeDriverAlertRideId=null,driverAudioContext=null,driverAudioReady=false;
 
 firebase.initializeApp(firebaseConfig);
 auth=firebase.auth();db=firebase.firestore();
+async function enableFerrariNotifications(){
+  try{
+    if(!user){
+      alert('سجل الدخول أولاً.');
+      return;
+    }
 
+    if(!('Notification' in window) || !('serviceWorker' in navigator)){
+      alert('المتصفح لا يدعم الإشعارات.');
+      return;
+    }
+
+    const supported = await firebase.messaging.isSupported();
+    if(!supported){
+      alert('الإشعارات غير مدعومة في هذا المتصفح.');
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      alert('لم تسمح باستقبال الإشعارات.');
+      return;
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+    const messaging = firebase.messaging();
+
+    const token = await messaging.getToken({
+      vapidKey: 'BKTYyPGvaNzAUoikdk-6-uW2iy9-umLX1ZTUFtaZ-26OF1PIWwQQGM5GokBU51rzxBBG7Y4nE5fYOs_-QDPgyhQ',
+      serviceWorkerRegistration: registration
+    });
+
+    if(!token) throw new Error('لم يتم إنشاء رمز الإشعارات.');
+
+    await db.collection('users').doc(user.uid).set({
+      fcmToken: token,
+      notificationsEnabled: true
+    }, {merge:true});
+
+    if(!window.ferrariMessageListener){
+      messaging.onMessage(payload=>{
+        const title = payload.notification?.title || 'FERRARI';
+        const body = payload.notification?.body || 'لديك إشعار جديد';
+        alert(title + '\n' + body);
+      });
+      window.ferrariMessageListener = true;
+    }
+
+    alert('تم تفعيل الإشعارات بنجاح.');
+  }catch(error){
+    console.error('FERRARI notifications:',error);
+    alert('تعذر تفعيل الإشعارات: ' + error.message);
+  }
+}
 auth.onAuthStateChanged(async u=>{
  user=u;
  if(u){await loadProfile();await updateAccountInfo();}
