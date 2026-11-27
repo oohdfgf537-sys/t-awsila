@@ -1,5 +1,30 @@
+importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
 
-const CACHE_NAME = "ferrari-app-v1";
+firebase.initializeApp({
+  apiKey: "AIzaSyDE_wyCpcoDStuUyNud9PiUPwezS83Xr00",
+  authDomain: "tawsila-53870.firebaseapp.com",
+  projectId: "tawsila-53870",
+  storageBucket: "tawsila-53870.firebasestorage.app",
+  messagingSenderId: "200480445099",
+  appId: "1:200480445099:web:2be93d9778ba54c84b1dee"
+});
+
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage(payload => {
+  const title = payload.notification?.title || "FERRARI | فيراري";
+
+  const options = {
+    body: payload.notification?.body || "لديك إشعار جديد",
+    icon: "./ferrari-icon.svg",
+    data: payload.data || {}
+  };
+
+  self.registration.showNotification(title, options);
+});
+
+const CACHE_NAME = "ferrari-app-v2";
 
 const FILES = [
   "./",
@@ -31,7 +56,6 @@ self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
-
   if (url.origin !== self.location.origin) return;
 
   if (event.request.mode === "navigate") {
