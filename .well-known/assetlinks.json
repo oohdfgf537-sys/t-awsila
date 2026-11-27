@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.ferrari.taFERRARIwsila",
+        "sha256_cert_fingerprints": ["A0:D0:A3:E0:ED:FE:32:DA:E0:6E:B5:31:33:71:7F:6D:71:A0:B8:3E:21:1F:8D:A0:96:BF:29:D1:4D:EF:A2:3C"]
+      }
+    }]
