@@ -1149,17 +1149,23 @@ function previewDriverPhoto(event){
 }
 function renderDriverAcceptedMapCard(ride,rideId){
  const box=el('driverRideMapCard');if(!box)return;
- const swipe=ride.driverArrived===true
-  ? '<div class="map-swipe"><small>بعد إكمال الرحلة اسحب الشريط حتى النهاية</small><input class="map-swipe-range" type="range" min="0" max="100" value="0" aria-label="اسحب لإنهاء الرحلة"><strong>اسحب لإنهاء الرحلة</strong></div>'
-  : '<div class="map-swipe"><small>عند وصولك إلى موقع الراكب اسحب الشريط حتى النهاية</small><input class="map-swipe-range" type="range" min="0" max="100" value="0" aria-label="اسحب لتأكيد الوصول"><strong>اسحب لتأكيد الوصول</strong></div>';
+ const swipe=ride.driverArrived!==true
+  ? '<div class="map-swipe"><small>عند وصولك إلى موقع الراكب اسحب الشريط حتى النهاية</small><input class="map-swipe-range" type="range" min="0" max="100" value="0" aria-label="اسحب لتأكيد الوصول"><strong>اسحب لتأكيد الوصول</strong></div>'
+  : ride.rideStarted!==true
+   ? '<div class="map-swipe"><small>بعد وصولك والالتقاء بالراكب اسحب لبدء الرحلة</small><input class="map-swipe-range" type="range" min="0" max="100" value="0" aria-label="اسحب لبدء الرحلة"><strong>اسحب لبدء الرحلة</strong></div>'
+   : '<div class="map-swipe"><small>بعد الوصول إلى الوجهة اسحب الشريط حتى النهاية</small><input class="map-swipe-range" type="range" min="0" max="100" value="0" aria-label="اسحب لإنهاء الرحلة"><strong>اسحب لإنهاء الرحلة</strong></div>';
  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><div style="font-size:12px;color:#777">سعر الرحلة المقبولة</div><div class="price">'+Number(ride.price||0).toFixed(2)+' د.ل</div></div><button class="cancel" type="button" onclick="cancelAcceptedRide(\''+rideId+'\')">إلغاء الرحلة</button></div><div style="font-size:12px;color:#666;margin-top:7px">'+escapeHtml(ride.pickupName||ride.pickup||'نقطة الانطلاق')+' ← '+escapeHtml(ride.destinationName||ride.destination||'الوجهة')+'</div>'+swipe;
  const control=box.querySelector('.map-swipe-range');
  control.addEventListener('change',async()=>{
   if(Number(control.value)<100)return;
   control.disabled=true;
-  if(ride.driverArrived===true)await completeRide(rideId);
-  else await markDriverArrived(rideId);
-  control.value=0;control.disabled=false;
+  try{
+   if(ride.driverArrived!==true)await markDriverArrived(rideId);
+   else if(ride.rideStarted!==true)await startRide(rideId);
+   else await completeRide(rideId);
+  }finally{
+   control.value=0;control.disabled=false;
+  }
  });
  box.classList.add('visible');
 }
@@ -1321,12 +1327,25 @@ async function markDriverArrived(rideId){
  }catch(e){alert('تعذر تأكيد الوصول: '+(e.code||'')+' — '+e.message)}
 }
 
+async function startRide(rideId){
+ if(!user||!profile||profile.role!=='driver'||profile.approved!==true){alert('حساب السائق غير معتمد');return}
+ try{
+  const ref=db.collection('rides').doc(rideId),snap=await ref.get();
+  if(!snap.exists||snap.data().driverId!==user.uid||snap.data().status!=='accepted'||snap.data().driverArrived!==true){
+   alert('لا يمكن بدء الرحلة قبل تأكيد الوصول.');return;
+  }
+  if(snap.data().rideStarted===true)return;
+  await ref.update({rideStarted:true,rideStartedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  showFerrariNotice('بدأت الرحلة','نتمنى لكم رحلة آمنة مع FERRARI.');
+ }catch(e){alert('تعذر بدء الرحلة: '+(e.code||'')+' — '+e.message)}
+}
+
 async function completeRide(rideId){
  if(!user||!profile||profile.role!=='driver'||profile.approved!==true){alert('حساب السائق غير معتمد');return}
  try{
   const ref=db.collection('rides').doc(rideId),snap=await ref.get();
-  if(!snap.exists||snap.data().driverId!==user.uid||snap.data().status!=='accepted'){
-   alert('لا يمكن إنهاء هذه الرحلة. تحقق من أنها مقبولة باسمك.');return;
+  if(!snap.exists||snap.data().driverId!==user.uid||snap.data().status!=='accepted'||snap.data().rideStarted!==true){
+   alert('لا يمكن إنهاء الرحلة قبل بدء الرحلة.');return;
   }
   await ref.update({status:'completed'});
   showCompletionExperience(snap.data(),rideId,'driver');
